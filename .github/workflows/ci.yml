@@ -12,7 +12,7 @@ jobs:
       LLM__BACKEND: fake
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
       - run: uv python install 3.12
