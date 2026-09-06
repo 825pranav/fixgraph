@@ -1,0 +1,74 @@
+[project]
+name = "fixgraph"
+version = "0.1.0"
+description = "Troubleshooting knowledge graph, GNN link prediction and GraphRAG benchmark on local open-weight models."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "httpx>=0.28.1",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "pyyaml>=6.0.3",
+    "torch>=2.14.0",
+    "torch-geometric>=2.8.0.post1",
+    "typer>=0.27.2",
+]
+
+[project.scripts]
+fixgraph = "fixgraph.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.12.18,<0.13.0"]
+build-backend = "uv_build"
+
+# --- CUDA PyTorch (spec §5.3) ---------------------------------------------
+# torch 2.14 ships cu126 / cu130 / cu132 builds; cu130 chosen (see docs/DECISIONS.md).
+[tool.uv.sources]
+torch = [{ index = "pytorch-cuda", marker = "sys_platform == 'win32' or sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cuda"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+# --- Tasks (spec §12.5) ------------------------------------------------------
+[tool.poe.tasks]
+fmt = { sequence = [{ cmd = "ruff format src tests scripts" }, { cmd = "ruff check --fix src tests scripts" }], help = "Format and autofix" }
+lint = { cmd = "ruff check src tests scripts", help = "Lint" }
+format-check = { cmd = "ruff format --check src tests scripts", help = "Check formatting" }
+types = { cmd = "pyright", help = "Type check" }
+test = { cmd = "pytest tests/unit", help = "Unit tests (no GPU / Ollama / network)" }
+check = { sequence = ["lint", "format-check", "types", "test"], help = "ruff + pyright + unit tests" }
+test-integration = { cmd = "pytest tests/integration -m integration", help = "Integration tests (needs Ollama running)" }
+gpu = { cmd = "python scripts/check_gpu.py", help = "Verify CUDA torch sees the GPU" }
+
+# --- Tooling -----------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.pyright]
+include = ["src", "tests", "scripts"]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
+venvPath = "."
+venv = ".venv"
+strict = ["src/fixgraph/core"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+addopts = "-ra --strict-markers"
+markers = ["integration: needs a running Ollama server (opt-in, excluded from CI)"]
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.168.1",
+    "poethepoet>=0.48.0",
+    "pyright>=1.1.414",
+    "pytest>=9.1.1",
+    "ruff>=0.16.8",
+    "types-pyyaml>=6.0.12.20260906",
+]
