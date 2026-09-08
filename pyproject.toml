@@ -6,11 +6,20 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "httpx>=0.28.1",
+    "mlflow>=3.16.1",
+    "polars>=1.44.2",
+    "pyarrow>=25.0.1",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
     "pyyaml>=6.0.3",
+    "qdrant-client>=1.19.1",
+    "rich>=15.0.0",
+    "scipy>=1.18.1",
+    "selectolax>=0.4.12",
+    "sentence-transformers>=6.1.0",
     "torch>=2.14.0",
     "torch-geometric>=2.8.0.post1",
+    "tqdm>=4.70.1",
     "typer>=0.27.2",
 ]
 
@@ -49,6 +58,8 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+# Unicode punctuation (›, NBSP, en dash) is intentional in support-article text handling.
+ignore = ["RUF001", "RUF002", "RUF003"]
 
 [tool.pyright]
 include = ["src", "tests", "scripts"]
@@ -72,3 +83,6 @@ dev = [
     "ruff>=0.16.8",
     "types-pyyaml>=6.0.12.20260906",
 ]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["typer.Option", "typer.Argument"]

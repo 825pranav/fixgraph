@@ -1,0 +1,103 @@
+# Seed ontology (spec §7.4). The LLM extracts; this file anchors canonicalization.
+# Aliases are matched case-insensitively on word boundaries. Product `patterns` are regexes
+# whose match is normalized (whitespace collapsed, family casing kept) to a canonical name.
+
+families:
+  iPhone:
+    aliases: [iphone]
+    patterns: ['iPhone\s+(?:\d{1,2}e|\d{1,2}(?:\s+(?:Pro\s+Max|Pro|Plus|mini))?|SE|Air|XS\s+Max|XS|XR|X)']
+  iPad:
+    aliases: [ipad, ipados]
+    patterns: ['iPad\s+(?:Pro|Air|mini)(?:\s+\d{1,2}(?:\.\d)?-inch)?(?:\s+\(\w+\s+generation\))?']
+  Apple Watch:
+    aliases: [apple watch, watchos]
+    patterns: ['Apple\s+Watch\s+(?:Series\s+\d{1,2}|Ultra(?:\s+\d)?|SE(?:\s+\d)?)']
+  AirPods:
+    aliases: [airpods]
+    patterns: ['AirPods\s+(?:Pro(?:\s+\d)?|Max|4|3|2)(?:\s+\(\d\w{1,2}\s+generation\))?']
+  Mac:
+    aliases: [mac, macbook, imac, mac mini, mac studio, mac pro, macos]
+    patterns: ['MacBook\s+(?:Air|Pro)', 'iMac(?:\s+Pro)?', 'Mac\s+(?:mini|Studio|Pro)']
+  Apple TV:
+    aliases: [apple tv, tvos]
+    patterns: ['Apple\s+TV\s+4K']
+  Apple Vision Pro:
+    aliases: [apple vision pro, visionos]
+    patterns: []
+  HomePod:
+    aliases: [homepod]
+    patterns: ['HomePod\s+mini']
+
+# Families that define the research corpus (spec §6.1).
+target_families: [iPhone, Apple Watch, AirPods, Mac, iPad]
+
+os_platforms:
+  iOS: {family: iPhone}
+  iPadOS: {family: iPad}
+  watchOS: {family: Apple Watch}
+  macOS: {family: Mac}
+  tvOS: {family: Apple TV}
+  visionOS: {family: Apple Vision Pro}
+  audioOS: {family: HomePod}
+
+# macOS marketing names -> major version
+macos_names:
+  Tahoe: 26
+  Sequoia: 15
+  Sonoma: 14
+  Ventura: 13
+  Monterey: 12
+  Big Sur: 11
+
+# Device dependencies (DEPENDS_ON seeds): child family requires a paired parent.
+dependencies:
+  - {child: Apple Watch, parent: iPhone}
+  - {child: AirPods, parent: iPhone}
+
+components:
+  Bluetooth: [bluetooth]
+  Wi-Fi: [wi-fi, wifi, wireless network]
+  Cellular: [cellular, mobile data, sim, esim]
+  Battery: [battery, charging, charger]
+  Display: [display, screen, touchscreen]
+  Face ID: [face id]
+  Touch ID: [touch id]
+  Camera: [camera]
+  Microphone: [microphone, mic]
+  Speaker: [speaker]
+  USB-C port: [usb-c, usb c]
+  Lightning port: [lightning port, lightning connector]
+  MagSafe: [magsafe]
+  Keyboard: [keyboard]
+  Trackpad: [trackpad]
+  Storage: [storage]
+  GPS: [gps, location services]
+  Digital Crown: [digital crown]
+  Charging case: [charging case]
+  Apple Pencil: [apple pencil]
+
+features:
+  iCloud: [icloud]
+  iCloud Photos: [icloud photos]
+  iCloud Backup: [icloud backup]
+  Find My: [find my]
+  Handoff: [handoff]
+  Continuity: [continuity]
+  AirDrop: [airdrop]
+  AirPlay: [airplay]
+  FaceTime: [facetime]
+  iMessage: [imessage, messages]
+  Apple Pay: [apple pay, wallet]
+  Apple Account: [apple account, apple id]
+  Two-factor authentication: [two-factor authentication, 2fa]
+  Family Sharing: [family sharing]
+  Screen Time: [screen time]
+  Siri: [siri]
+  Software Update: [software update]
+  Recovery mode: [recovery mode, dfu mode]
+  Activation Lock: [activation lock]
+  Automatic ear detection: [automatic ear detection]
+  Personal Hotspot: [personal hotspot]
+  Emergency SOS: [emergency sos]
+  Time Machine: [time machine]
+  FileVault: [filevault]

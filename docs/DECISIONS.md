@@ -63,3 +63,75 @@ torch as §5.9 specifies.
 ### Measured
 qwen3:4b Q4_K_M, fully in VRAM (3.0 GiB), 8k context: warm structured call ≈ 1.1 s for
 29 prompt / 26 output tokens (~23 tok/s generation); cold load ≈ 4 s.
+
+## M1: Corpus (2026-09-23)
+
+**Plan / files touched:** `src/fixgraph/ingest/{scrape,parse,chunk,select,store,cli}.py`,
+`src/fixgraph/core/{models,ontology}.py`, `configs/ontology.yaml`, `DATA.md`,
+`tests/unit/test_{scrape,parse,chunk,ontology,corpus_store_select}.py`, a synthetic HTML fixture.
+
+### D10: URL discovery from the sitemap, not crawling
+`robots.txt` publishes a sitemap index; its `ac` sitemap lists ~1,900 numeric en-us articles.
+Crawling links would hit disallowed search pages; the sitemap is the polite, complete source.
+
+### D11: Scrape everything, then select ~1,000
+Fetching all ~1,900 pages at 1 req/s takes ~35 min, and it makes corpus selection a
+transparent, testable scoring function instead of a guess made at crawl time.
+
+### D12: Parser keyed on Apple's `gb-*` classes inside `#content`
+Headings are `h2/h3.gb-header`, paragraphs `p.gb-paragraph`, steps `ol.gb-list > li`, notes
+`div.gb-note/gb-callout`. In-page tables of contents (lists whose links are all `#anchors`),
+global navigation and a site-wide third-party disclaimer are dropped. An empty parent heading
+is folded into its first child's heading ("Unpair and pair again › On your iPhone") so the
+context survives chunking.
+
+### D13: Token counting
+`\w+|[^\w\s]` count as a deterministic, dependency-free estimate of BPE tokens for English.
+Good enough for the 200–500 token chunk bounds; the LLM context budget uses Ollama's own
+counts.
+
+### D14: Windows Smart App Control
+Smart App Control (enforcement mode) intermittently blocked unsigned compiled extensions in
+the venv (`scipy/linalg/cython_lapack`, `sklearn/.../_radius_neighbors`). The developer turned
+it off. Anyone reproducing on Windows 11 with SAC on will see `DLL load failed ... Application
+Control policy`.
+
+## M2: Knowledge graph (2026-09-23)
+
+### D15: Prompt v1 (entity list + index-based relations) rejected
+On 10 real chunks qwen3:4b produced **zero** valid relations: every one violated head/tail type
+constraints (e.g. `Bluetooth HAS_COMPONENT iPhone`, `Symptom EXHIBITS Component`), and one
+chunk ran to the 1,500-token cap. Small models are poor at wiring relations by index.
+
+### D16: Prompt v2, a problem-centric nested schema
+The model fills `products[] -> problems[] -> {symptom, products, error_codes, components,
+features, os_versions, causes, fixes[] -> {action, addresses_cause, requires}}`. The relation
+type is implied by where a string sits, so type violations are impossible by construction;
+`kg.extraction.to_graph` converts deterministically to typed triples. All lists have
+`maxItems` so constrained decoding cannot run away. This is the "small-model tactic" of
+§8.1, chosen over two-pass extraction because it needs one call per chunk.
+Sample of 16 real chunks: 16/16 valid JSON, 0 type violations, 78% of relations grounded.
+
+### D17: Grounding-based confidence and context-aware validation
+Every entity and relation evidence string is fuzzy-matched against what the model saw
+(article title + section heading + chunk); threshold 0.9 for relation evidence (spec) and
+0.8 for entity grounding. `extraction_confidence = min(head, tail, evidence)` grounding
+scores; self-reported confidences from a 4B model are uninformative. Grounding against the
+title/heading as well as the chunk raised kept relations from 61% to 78% on the sample (the
+symptom is usually stated in the article title).
+
+### D18: Throughput
+qwen3:4b Q4_K_M, 8k ctx, prompt v2: 6.2 s/chunk at concurrency 1, 5.4 s/chunk at
+concurrency 2 (GPU otherwise idle). With a game running on the GPU it was 3–4x slower
+(VRAM contention forces partial CPU offload), so long runs need the GPU to themselves.
+
+### D19: Entity resolution
+Rule-based for Product (ontology model patterns, then families), OSVersion (regex + macOS
+marketing names; unversioned mentions like "macOS" are dropped), ErrorCode, Component and
+Feature (ontology aliases, else normalized text). Symptom/Cause/Fix: Qwen3-Embedding-0.6B +
+average-linkage agglomerative clustering on cosine distance (scipy), per-type thresholds, medoid
+as canonical; greedy leader clustering above 12k distinct strings (memory). Optional LLM
+adjudication for borderline cluster pairs (similarity band just below the threshold), capped
+at 500 pairs, cached. Every merge is logged to `data/kg/merges.jsonl`.
+Sanity check: paraphrases score 0.91–0.98 cosine, different problems 0.4–0.7, so default
+distance thresholds 0.10–0.12 sit in the gap; tuned on labeled pairs below.
