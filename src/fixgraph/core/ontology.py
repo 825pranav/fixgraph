@@ -12,7 +12,9 @@ from fixgraph.core.paths import CONFIGS_DIR
 DEFAULT_ONTOLOGY = CONFIGS_DIR / "ontology.yaml"
 
 _OS_VERSION_RE = re.compile(
-    r"\b(iOS|iPadOS|watchOS|macOS|tvOS|visionOS|audioOS)\s+(\d{1,2}(?:\.\d{1,2}){0,2})\b"
+    # Optional marketing name between platform and number: "macOS Ventura 13.5".
+    r"\b(iOS|iPadOS|watchOS|macOS|tvOS|visionOS|audioOS)\s+(?:[A-Z][a-z]+(?:\s[A-Z][a-z]+)?\s+)?"
+    r"(\d{1,2}(?:\.\d{1,2}){0,2})\b"
 )
 
 
@@ -34,7 +36,7 @@ class Ontology(BaseModel):
     families: dict[str, FamilySpec]
     target_families: list[str]
     os_platforms: dict[str, OSPlatform]
-    macos_names: dict[str, int]
+    macos_names: dict[str, str]  # marketing name -> version, e.g. Catalina -> 10.15
     dependencies: list[Dependency]
     components: dict[str, list[str]]
     features: dict[str, list[str]]
@@ -66,8 +68,9 @@ class Ontology(BaseModel):
 
     @cached_property
     def _macos_name_re(self) -> re.Pattern[str]:
-        names = "|".join(re.escape(n) for n in self.macos_names)
-        return re.compile(rf"\bmacOS\s+({names})\b")
+        names = "|".join(re.escape(n) for n in sorted(self.macos_names, key=len, reverse=True))
+        # "macOS Ventura 13.5": the explicit number wins, so the name is only used when bare.
+        return re.compile(rf"\bmacOS\s+({names})\b(?!\s+\d)")
 
     def families_in(self, text: str) -> list[str]:
         """Product families mentioned in `text`, sorted."""

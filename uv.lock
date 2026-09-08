@@ -432,6 +432,7 @@ name = "fixgraph"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "fastapi" },
     { name = "httpx" },
     { name = "mlflow" },
     { name = "polars" },
@@ -449,6 +450,7 @@ dependencies = [
     { name = "torch-geometric" },
     { name = "tqdm" },
     { name = "typer" },
+    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
@@ -463,6 +465,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "fastapi", specifier = ">=0.141.1" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "mlflow", specifier = ">=3.16.1" },
     { name = "polars", specifier = ">=1.44.2" },
@@ -480,6 +483,7 @@ requires-dist = [
     { name = "torch-geometric", specifier = ">=2.8.0.post1" },
     { name = "tqdm", specifier = ">=4.70.1" },
     { name = "typer", specifier = ">=0.27.2" },
+    { name = "uvicorn", specifier = ">=0.53.0" },
 ]
 
 [package.metadata.requires-dev]

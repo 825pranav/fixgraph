@@ -42,12 +42,16 @@ os_platforms:
 
 # macOS marketing names -> major version
 macos_names:
-  Tahoe: 26
-  Sequoia: 15
-  Sonoma: 14
-  Ventura: 13
-  Monterey: 12
-  Big Sur: 11
+  Tahoe: "26"
+  Sequoia: "15"
+  Sonoma: "14"
+  Ventura: "13"
+  Monterey: "12"
+  Big Sur: "11"
+  Catalina: "10.15"
+  Mojave: "10.14"
+  High Sierra: "10.13"
+  Sierra: "10.12"
 
 # Device dependencies (DEPENDS_ON seeds): child family requires a paired parent.
 dependencies:

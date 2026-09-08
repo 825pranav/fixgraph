@@ -6,7 +6,10 @@ import typer
 from pydantic import BaseModel
 
 from fixgraph import __version__
+from fixgraph.bench.cli import app as bench_app
+from fixgraph.bench.cli import index_app
 from fixgraph.core.config import load_settings
+from fixgraph.gnn.cli import app as gnn_app
 from fixgraph.ingest.cli import app as ingest_app
 from fixgraph.kg.cli import app as kg_app
 from fixgraph.llm import ChatMessage, LLMRequest, complete_structured
@@ -17,6 +20,9 @@ llm_app = typer.Typer(no_args_is_help=True, help="LLM backend utilities.")
 app.add_typer(llm_app, name="llm")
 app.add_typer(ingest_app, name="ingest")
 app.add_typer(kg_app, name="kg")
+app.add_typer(gnn_app, name="gnn")
+app.add_typer(index_app, name="index")
+app.add_typer(bench_app, name="bench")
 
 
 @app.callback()
@@ -67,6 +73,16 @@ def llm_smoke(
     finally:
         client.close()
     typer.echo(result.model_dump_json(indent=2))
+
+
+@app.command()
+def serve(host: str = typer.Option("127.0.0.1"), port: int = typer.Option(8000)) -> None:
+    """Run the FastAPI service (fake mode when LLM__BACKEND=fake or no corpus exists)."""
+    import uvicorn
+
+    from fixgraph.api.app import create_app
+
+    uvicorn.run(create_app(), host=host, port=port)
 
 
 if __name__ == "__main__":

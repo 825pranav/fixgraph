@@ -44,3 +44,17 @@ def test_selection_prefers_troubleshooting_and_targets() -> None:
     chosen = select_corpus([other, howto, trouble, legal], onto, target=1)
     assert [a.article_id for a in chosen] == ["3"]
     assert [a.article_id for a in select_corpus([trouble, howto], onto, 10)] == ["2", "3"]
+
+
+def test_subset_by_chunk_budget_keeps_gold_and_whole_articles() -> None:
+    from fixgraph.ingest.select import subset_by_chunk_budget
+
+    onto = load_ontology()
+    arts = [
+        _art("1", "If your iPhone won't charge", ["iPhone"]),
+        _art("2", "Use Maps on your iPhone", ["iPhone"]),
+        _art("3", "If your AirPods won't connect", ["AirPods"]),
+    ]
+    counts = {"1": 4, "2": 3, "3": 4}
+    kept = subset_by_chunk_budget(arts, counts, onto, max_chunks=7, must_keep={"2"})
+    assert [a.article_id for a in kept] == ["1", "2"]  # gold "2" first, then best that fits
