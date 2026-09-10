@@ -144,3 +144,52 @@ Every system (RAG and GraphRAG) indexes the same 500 chunks, so the comparison s
 full corpus is kept in `articles_full.parquet` / `chunks_full.parquet` and the pipeline can be
 rerun at full size. Cost: a smaller graph (fewer multi-hop paths, sparser GNN training data)
 and wider confidence intervals; per-chunk extraction quality is unchanged.
+
+## M3–M7: Retrieval, benchmark, GNN, serving (2026-09-23)
+
+### D21: Qdrant local mode supports the hybrid
+Verified in local mode (`QdrantClient(path=...)`): named dense + sparse vectors, `Modifier.IDF`
+on the sparse vector (so documents store only the BM25 TF component) and RRF fusion via
+`prefetch`. No switch to LanceDB needed. BM25 term ids are CRC32 hashes (no vocabulary file).
+
+### D22: Reranker
+`BAAI/bge-reranker-v2-m3` loads cleanly with sentence-transformers' `CrossEncoder` (fp16 on
+GPU). S1, S2 and S3 all rerank their top 30 candidates with it, so only candidate generation
+differs between systems.
+
+### D23: GraphRAG details
+- Entity linking: LLM mentions (qwen3:4b, cached) merged with rule-based ontology mentions,
+  matched against a dense index of node names *and* extracted surface forms (aliases); seed
+  weight = similarity x HippoRAG node specificity 1/log(2 + #chunks).
+- S2: PPR (damping 0.5, as in HippoRAG) on the undirected KG with relation-type weights
+  (IN_FAMILY 0.2 ... RESOLVED_BY 1.0) x extraction confidence; chunk score = sum of PPR mass of
+  the nodes each chunk supports. Implementation matches `networkx.pagerank` to 1e-6
+  (property-tested on random graphs including dangling nodes).
+- S3: beam search (width 300, <= 3 hops, IN_FAMILY excluded) for paths ending in
+  Symptom/Cause/Fix; paths that touch several seeds are boosted; evidence = provenance chunks
+  of path edges.
+- Both fall back to S1 candidates when no seed links (reported as `graph_fallback`).
+- Predicted (GNN) edges are routing-only: their chunks never become evidence.
+
+### D24: GNN decoder skip term
+First run: hetero-GraphSAGE with a pure dot-product decoder scored filtered MRR 0.03 on the
+article-held-out split, far below the cosine baseline (0.22): with a few hundred training
+pairs it overfits and loses the text signal. The decoder now adds a learnable weight on the
+cosine of the input text features (a skip connection), so graph structure is learned as a
+correction on top of text similarity. Baselines are still reported separately.
+
+### D25: Benchmark scope under the time box
+30 hand-written dev questions (8 single-hop, 6 cross-device, 5 version-conditional, 5
+error-code, 3 multi-constraint, 3 unanswerable), gold chunks checked against the corpus text.
+Written by Claude from the corpus and marked unverified until the developer reviews them.
+Path-based generation (`fixgraph bench generate`) and the keystroke verification CLI
+(`fixgraph bench verify`) are implemented and tested but were not run at scale; the ≥150
+human-verified questions and the 80–100 judge-validation labels are future work that needs
+the developer's time.
+
+### D26: Metric definitions
+Citation precision/recall are measured against the gold support chunks; unsupported-claim
+rate comes from the qwen3:8b claim verifier; correctness is the qwen3:8b rubric (0/0.5/1);
+unanswerable questions score 1 only when the system abstains. CIs: percentile bootstrap
+(2,000 resamples). Tests: paired sign-flip permutation (10,000), S1 vs each system,
+Holm-corrected per metric.

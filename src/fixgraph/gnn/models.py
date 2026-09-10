@@ -162,20 +162,29 @@ class HeteroSAGE(nn.Module):
     ) -> None:
         super().__init__()
         self.encoder = to_hetero(_SAGE(hidden, out), metadata, aggr="sum")
+        # Skip term: learnable weight on the cosine of the input text features, so structure
+        # is learned as a correction on top of text similarity (DECISIONS.md D24).
+        self.text_weight = nn.Parameter(torch.tensor(5.0))
+        self._x: dict[str, Tensor] = {}
 
     def forward(self, data: HeteroData) -> dict[str, Tensor]:
+        self._x = {t: nn.functional.normalize(data[t].x, dim=-1) for t in ("Symptom", "Fix")}
         return self.encoder(data.x_dict, data.edge_index_dict)
 
-    @staticmethod
-    def decode(z: dict[str, Tensor], symptoms: Tensor, fixes: Tensor) -> Tensor:
-        return (z["Symptom"][symptoms] * z["Fix"][fixes]).sum(-1)
+    def decode(self, z: dict[str, Tensor], symptoms: Tensor, fixes: Tensor) -> Tensor:
+        structural = (z["Symptom"][symptoms] * z["Fix"][fixes]).sum(-1)
+        text = (self._x["Symptom"][symptoms] * self._x["Fix"][fixes]).sum(-1)
+        return structural + self.text_weight * text
 
     @torch.no_grad()
     def scores(self, data: HeteroData, symptoms: Tensor) -> Tensor:
         self.eval()
         dev = next(self.parameters()).device
         z = self(data.to(dev))
-        return (z["Symptom"][symptoms.to(dev)] @ z["Fix"].t()).cpu()
+        s = symptoms.to(dev)
+        structural = z["Symptom"][s] @ z["Fix"].t()
+        text = self._x["Symptom"][s] @ self._x["Fix"].t()
+        return (structural + self.text_weight * text).cpu()
 
 
 def train_sage(
