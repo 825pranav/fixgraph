@@ -181,7 +181,7 @@ correction on top of text similarity. Baselines are still reported separately.
 ### D25: Benchmark scope under the time box
 30 hand-written dev questions (8 single-hop, 6 cross-device, 5 version-conditional, 5
 error-code, 3 multi-constraint, 3 unanswerable), gold chunks checked against the corpus text.
-Written by Claude from the corpus and marked unverified until the developer reviews them.
+Drafted with an AI assistant from the corpus text and marked unverified until the developer reviews them.
 Path-based generation (`fixgraph bench generate`) and the keystroke verification CLI
 (`fixgraph bench verify`) are implemented and tested but were not run at scale; the ≥150
 human-verified questions and the 80–100 judge-validation labels are future work that needs

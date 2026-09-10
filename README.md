@@ -85,6 +85,41 @@ and are never used as evidence; e.g. for *"forgot your iPhone passcode"* the mod
 *"use your old passcode to unlock your iPhone within 72 hours"* (Passcode Reset), a fix
 documented in a different article.
 
+## Project status
+
+| Milestone | Status |
+|---|---|
+| M0 scaffold, CUDA check, LLM client + cache | done |
+| M1 corpus: 1,915 scraped, 1,000 selected, deterministic chunking | done (500-chunk working set) |
+| M2 knowledge graph, validation, resolution, quality report | done; gold set pending human review |
+| M3 hybrid RAG, grounded answers, verifier, stats harness | done |
+| M4 GraphRAG (PPR, typed paths), entity linking | done; linking accuracy pending generated questions |
+| M5 benchmark: generation + verification tooling | tooling done; ≥150 verified questions and judge κ pending |
+| M6 GNN: baselines, hetero-SAGE, gap report | done (S4 routing not run) |
+| M7 FastAPI, Docker (CI-built), write-up | done |
+
+Next steps: review gold annotations (`fixgraph kg annotate`), generate and verify multi-article
+questions (`fixgraph bench generate`, `fixgraph bench verify`), rerun the benchmark on them, and
+label ~80 answers to validate the judge.
+
+## Repository layout
+
+```
+src/fixgraph/
+  core/        pydantic models, config, ontology, paths
+  llm/         LLMClient protocol: Ollama native, OpenAI-compatible, fake; SQLite cache
+  ingest/      scraper, parser, chunker, corpus selection
+  kg/          extraction schema + prompt, validation, resolution, parquet store, quality eval
+  retrieval/   BM25, Qdrant index, hybrid RAG, entity linking, PPR, typed paths
+  answer/      grounded generation, claim verifier
+  bench/       questions, runner, judge, metrics, statistics, generation/verification
+  gnn/         HeteroData export, splits, baselines, hetero GraphSAGE, evaluation
+  api/         FastAPI service
+configs/       base.yaml, ontology.yaml
+docs/          DECISIONS.md (every design decision), annotation guidelines
+data/gold, data/bench   committed annotations and questions (no raw article text)
+```
+
 ## Limitations
 
 - **Unverified evaluation data.** The 30 dev questions, their gold chunks and the 50-chunk
