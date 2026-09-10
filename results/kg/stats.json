@@ -1,0 +1,110 @@
+{
+  "nodes": 2201,
+  "edges_extracted": 2926,
+  "nodes_by_label": {
+    "Fix": 978,
+    "Cause": 416,
+    "Symptom": 256,
+    "Article": 220,
+    "Component": 168,
+    "OSVersion": 54,
+    "Feature": 47,
+    "Product": 45,
+    "ErrorCode": 10,
+    "ProductFamily": 7
+  },
+  "edges_by_rel": {
+    "RESOLVED_BY": 1025,
+    "ADDRESSES": 422,
+    "EXHIBITS": 396,
+    "CAUSED_BY": 375,
+    "INVOLVES": 237,
+    "HAS_COMPONENT": 219,
+    "REQUIRES": 72,
+    "APPLIES_TO": 68,
+    "RUNS": 60,
+    "IN_FAMILY": 24,
+    "DEPENDS_ON": 17,
+    "SIGNALS": 11
+  },
+  "degree_by_label": {
+    "Fix": {
+      "mean": 1.55,
+      "median": 1.0,
+      "max": 15,
+      "isolated_pct": 6.6
+    },
+    "Cause": {
+      "mean": 1.92,
+      "median": 2.0,
+      "max": 9,
+      "isolated_pct": 11.3
+    },
+    "Symptom": {
+      "mean": 8.25,
+      "median": 7.0,
+      "max": 37,
+      "isolated_pct": 0.0
+    },
+    "Article": {
+      "mean": 0.0,
+      "median": 0.0,
+      "max": 0,
+      "isolated_pct": 100.0
+    },
+    "Component": {
+      "mean": 2.54,
+      "median": 1.0,
+      "max": 37,
+      "isolated_pct": 0.6
+    },
+    "OSVersion": {
+      "mean": 3.15,
+      "median": 2.0,
+      "max": 12,
+      "isolated_pct": 1.9
+    },
+    "Feature": {
+      "mean": 1.02,
+      "median": 1.0,
+      "max": 3,
+      "isolated_pct": 10.6
+    },
+    "Product": {
+      "mean": 16.53,
+      "median": 2.0,
+      "max": 183,
+      "isolated_pct": 6.7
+    },
+    "ErrorCode": {
+      "mean": 1.1,
+      "median": 1.0,
+      "max": 2,
+      "isolated_pct": 0.0
+    },
+    "ProductFamily": {
+      "mean": 3.43,
+      "median": 2.0,
+      "max": 7,
+      "isolated_pct": 0.0
+    }
+  },
+  "symptoms_with_fix_pct": 94.9,
+  "components_excluding_articles": 146,
+  "largest_component_nodes": 1785,
+  "edges_with_provenance_pct": 100.0,
+  "records": 500,
+  "failed_records": 0,
+  "dropped_mentions": {
+    "Fix:ungrounded": 73,
+    "Cause:ungrounded": 73,
+    "OSVersion:no_canonical": 73,
+    "Symptom:ungrounded": 38,
+    "Component:ungrounded": 9,
+    "OSVersion:ungrounded": 5,
+    "Product:ungrounded": 5,
+    "Feature:ungrounded": 3,
+    "ErrorCode:no_canonical": 3
+  },
+  "merge_groups": 329
+}

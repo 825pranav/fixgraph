@@ -267,3 +267,49 @@ def bench_verify(
     qs = read_questions(path)
     n = verify_loop(qs, chunk_text, lambda q: write_questions(q, path), reviewer)
     typer.echo(f"verified {n}; {sum(q.verified for q in qs)}/{len(qs)} verified in file")
+
+
+@app.command("label")
+def bench_label(
+    run_name: str = typer.Option("dev"),
+    questions_file: str = typer.Option("data/bench/dev_handwritten.jsonl"),
+    n: int = typer.Option(80, help="Answers to label (spec: 80-100)."),
+    labeler: str = typer.Option("developer"),
+) -> None:
+    """Blind human labels for judge validation: [1] correct [5] partial [0] wrong."""
+    from fixgraph.bench.validate import (
+        agreement,
+        label_loop,
+        load_run,
+        read_labels,
+        sample_for_labeling,
+        write_labels,
+    )
+
+    settings = load_settings()
+    run_dir = settings.paths.results / run_name
+    questions = {q.qid: q for q in read_questions(Path(questions_file))}
+    answers, judged = load_run(run_dir)
+    labels_path = settings.paths.bench / f"judge_labels_{run_name}.jsonl"
+    todo = sample_for_labeling(list(answers), questions, n)
+    labels = label_loop(
+        todo,
+        questions,
+        answers,
+        read_labels(labels_path),
+        lambda x: write_labels(x, labels_path),
+        labeler,
+    )
+    if labels:
+        typer.echo(agreement(labels, judged).model_dump_json(indent=2))
+
+
+@app.command("kappa")
+def bench_kappa(run_name: str = typer.Option("dev")) -> None:
+    """Cohen's kappa between human labels and the LLM judge for a run."""
+    from fixgraph.bench.validate import agreement, load_run, read_labels
+
+    settings = load_settings()
+    _, judged = load_run(settings.paths.results / run_name)
+    labels = read_labels(settings.paths.bench / f"judge_labels_{run_name}.jsonl")
+    typer.echo(agreement(labels, judged).model_dump_json(indent=2))
