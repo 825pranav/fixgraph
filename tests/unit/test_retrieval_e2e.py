@@ -1,5 +1,9 @@
 """Retrieval + answering + report on a tiny synthetic corpus: real Qdrant local mode,
-fake embedder/reranker/LLM (no GPU, no network)."""
+fake embedder/reranker/LLM (no GPU, no network).
+
+Covers retrieval (index, hybrid, graph, graphrag, linking), answer.grounded, answer.verifier
+and bench.run's report.
+"""
 
 import json
 from pathlib import Path
@@ -184,7 +188,8 @@ def test_report_end_to_end(tmp_path: Path) -> None:
             qtype="single_hop",
             gold_answer="a",
             key_facts=["a"],
-            gold_chunk_ids=["c1"],
+            # q0-q2 cite one article, q3-q5 two (chunk ids start with the article id)
+            gold_chunk_ids=["a:0:0"] if i < 3 else ["a:0:0", "b:0:0"],
         )
         for i in range(6)
     ] + [Question(qid="u", question="u", qtype="unanswerable", answerable=False)]
@@ -196,15 +201,18 @@ def test_report_end_to_end(tmp_path: Path) -> None:
                     qid=q.qid,
                     system=s,
                     result=RetrievalResult(
-                        chunk_ids=["c1"] if good else ["c2"], timings={"total_s": 0.1}
+                        chunk_ids=["a:0:0", "b:0:0"] if good else ["z:0:0"],
+                        timings={"total_s": 0.1},
                     ),
                 )
             )
             ga = GroundedAnswer(
                 question=q.question,
                 abstained=not q.answerable,
-                sentences=[] if not q.answerable else [AnswerSentence(text="a", citations=["c1"])],
-                context_chunk_ids=["c1"],
+                sentences=[]
+                if not q.answerable
+                else [AnswerSentence(text="a", citations=["a:0:0"])],
+                context_chunk_ids=["a:0:0"],
             )
             ans.append(AnswerRow(qid=q.qid, system=s, answer=ga))
             jud.append(
@@ -226,6 +234,12 @@ def test_report_end_to_end(tmp_path: Path) -> None:
     corr = next(t for t in rep["tests"] if t["metric"] == "correctness")
     assert corr["diff"] > 0 and corr["p"] < 0.05
     assert rep["table"]["S1"]["abstention_recall"]["mean"] == 1.0
+    spans = rep["by_evidence_span"]
+    assert spans["multi-article"]["S2"]["n"] == 3 and spans["single-article"]["S2"]["n"] == 4
+    assert spans["multi-article"]["S2"]["recall@8"] == 1.0
+    multi = next(t for t in rep["multi_article_tests"] if t["metric"] == "correctness")
+    assert multi["n"] == 3 and multi["diff"] == 1.0
+    assert rep["provenance"] == {"human_verified": 0, "auto_screen_passed": 0, "total": 7}
     md = render_markdown(rep)
-    assert "| correctness |" in md
+    assert "| correctness |" in md and "| multi-article |" in md
     json.dumps(rep)  # serializable

@@ -1,9 +1,20 @@
+"""Tests bench/generate.py and question selection: stratified path sampling (incl. the
+two-article multi_constraint type), question generation with the fake LLM, the human verify loop,
+and the --questions filter in bench/schema.py."""
+
 from pathlib import Path
 
 import pytest
 
+from fixgraph.bench.cli import _parse_mix
 from fixgraph.bench.generate import PathSample, generate_question, sample_paths, verify_loop
-from fixgraph.bench.schema import Question, read_questions, write_questions
+from fixgraph.bench.schema import (
+    Question,
+    ScreenResult,
+    read_questions,
+    select_questions,
+    write_questions,
+)
 from fixgraph.core.models import Article
 from fixgraph.core.ontology import load_ontology
 from fixgraph.embeddings import FakeEmbedder
@@ -56,6 +67,76 @@ def test_sample_paths_covers_types(kg) -> None:  # type: ignore[no-untyped-def]
     types = {s.qtype for s in samples}
     assert {"single_hop", "cross_device", "version_conditional", "error_code"} <= types
     assert all(s.chunk_ids == ["1:0:0"] for s in samples)
+    assert all(s.answer_texts for s in samples)  # answer node text is filled in
+
+
+def _record(chunk_id: str, symptom: str, text: str) -> ExtractionRecord:
+    x = LLMExtraction(
+        products=[LLMProduct(name="AirPods")],
+        problems=[
+            LLMProblem(
+                symptom=symptom,
+                products=["AirPods"],
+                fixes=[LLMFix(action="put both AirPods in the charging case")],
+            )
+        ],
+    )
+    g = to_graph(x, load_ontology())
+    return ExtractionRecord(
+        chunk_id=chunk_id,
+        model="m",
+        prompt_version="v2",
+        extracted_at="t",
+        ok=True,
+        raw=x,
+        graph=g,
+        validated=validate(g, text),
+    )
+
+
+def test_multi_constraint_pairs_symptoms_from_different_articles() -> None:
+    recs = [
+        _record(
+            "1:0:0",
+            "AirPods won't connect",
+            "If AirPods won't connect, put both AirPods in the charging case.",
+        ),
+        _record(
+            "2:0:0",
+            "status light doesn't flash",
+            "If the status light doesn't flash, put both AirPods in the charging case.",
+        ),
+    ]
+    arts = [Article(article_id=a, url="u", title="t") for a in ("1", "2")]
+    built, _ = build_kg(recs, arts, load_ontology(), FakeEmbedder())
+    samples = sample_paths(built, {"multi_constraint": 5})
+    assert len(samples) == 1
+    s = samples[0]
+    assert s.qtype == "multi_constraint" and s.article_ids == ["1", "2"]
+    assert len(s.seed_nodes) == 2 and len(s.answer_nodes) == 1
+
+
+def test_parse_mix() -> None:
+    assert _parse_mix("single_hop=4, multi_constraint=2") == {
+        "single_hop": 4,
+        "multi_constraint": 2,
+    }
+
+
+def test_select_questions_filters() -> None:
+    ok = ScreenResult(
+        passed=True, reason="", answerable=True, answer_supported=True, leaks_answer=False
+    )
+    bad = ok.model_copy(update={"passed": False})
+    qs = [
+        Question(qid="v", question="v", qtype="single_hop", verified=True),
+        Question(qid="p", question="p", qtype="single_hop", screen=ok),
+        Question(qid="f", question="f", qtype="single_hop", screen=bad),
+        Question(qid="n", question="n", qtype="single_hop"),
+    ]
+    assert [q.qid for q in select_questions(qs, "verified")] == ["v"]
+    assert [q.qid for q in select_questions(qs, "screened")] == ["v", "p"]
+    assert len(select_questions(qs, "all")) == 4
 
 
 def test_generate_question_and_verify(tmp_path: Path) -> None:
@@ -74,6 +155,7 @@ def test_generate_question_and_verify(tmp_path: Path) -> None:
     )
     q = generate_question(fake, s, {"1:0:0": TEXT}, "m", "g0")
     assert q is not None and q.gold_chunk_ids == ["1:0:0"] and not q.verified
+    assert q.gold_answer_nodes == ["b"]
     qs = [q, Question(qid="g1", question="bad", qtype="single_hop")]
     path = tmp_path / "q.jsonl"
     keys = iter(["y", "n"])

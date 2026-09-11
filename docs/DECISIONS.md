@@ -193,3 +193,46 @@ rate comes from the qwen3:8b claim verifier; correctness is the qwen3:8b rubric 
 unanswerable questions score 1 only when the system abstains. CIs: percentile bootstrap
 (2,000 resamples). Tests: paired sign-flip permutation (10,000), S1 vs each system,
 Holm-corrected per metric.
+
+## Test benchmark: multi-article questions (2026-09-25)
+
+### D27: Question types that genuinely need two articles
+The original `cross_device` paths looked multi-article (755 of 768 candidates cite chunks from
+two articles), but the second article only supplied the `DEPENDS_ON` fact ("AirPods depend on
+iPhone"), which the answer does not need. Counting them as multi-hop would overstate what the
+benchmark tests. New type `multi_constraint`: two symptoms, each resolved by the SAME fix node,
+where each `RESOLVED_BY` edge is supported by a different article ("I have problem A and
+problem B; what one thing could help with both?"). Confirming that the fix covers both needs
+both articles. Fixes shared by more than 3 symptoms ("Restart your device") are excluded
+because they are guessable closed-book. `version_conditional` paths whose fix and version
+requirement come from different articles are sampled first. Default mix: 40 single_hop
+(control), 80 multi_constraint, 30 version_conditional, 30 cross_device, 11 error_code (all
+that exist).
+
+### D28: Gold answers anchored to the graph
+First smoke run: the generator padded gold answers with invented reasons ("by addressing
+potential system conflicts") and phrased multi_constraint questions as yes/no questions that
+named the fix. The prompt now passes the answer node's text as "the correct answer", requires
+the reference answer to restate it using only source text, and forbids naming the answer in
+the question.
+
+### D29: Automatic pre-screen before human verification
+`fixgraph bench screen` annotates every generated question; it never sets `verified`.
+- Answer leak: deterministic. Share of the answer node's content words (crude stemming,
+  device/app names and the question's own seed-node words removed) already in the question;
+  >= 0.6 flags a leak. An LLM leak check approved obvious leaks in the smoke run.
+- Support: qwen3:8b must copy the supporting evidence sentence verbatim; code checks the quote
+  occurs in the evidence (fuzzy partial ratio >= 0.85). In the first smoke run an LLM-only
+  screen passed 6/6 questions including a nonsense one; with the quote check it rejects
+  unsupported answers.
+- Multi-article check: each article's evidence is shown alone; if any single article fully
+  answers the question, `needs_multiple_articles = False`.
+`bench verify` shows the verdict and orders the queue (passed multi-article first), so a
+time-boxed human review spends its time on likely keepers. Reports state how many questions are
+human-verified vs only auto-screened; `bench run --questions screened|verified` selects them.
+
+### D30: Reporting by evidence span
+The report splits correctness and recall@8 by single- vs multi-article gold evidence and runs
+the paired permutation tests (Holm) on the multi-article subset alone, because that subset is
+where the research question lives. Judge-validation labels are sampled round-robin across
+systems so kappa is not dominated by one retriever.

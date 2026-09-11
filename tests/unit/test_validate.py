@@ -1,3 +1,7 @@
+"""Tests bench/validate.py: balanced, deterministic label sampling, the resumable blind label
+loop, and judge-human agreement (Cohen's kappa)."""
+
+from collections import Counter
 from pathlib import Path
 
 from fixgraph.bench.schema import Question
@@ -26,6 +30,12 @@ def test_sample_excludes_unanswerable_and_is_deterministic() -> None:
     a = sample_for_labeling(keys, _qs(), n=5)
     assert a == sample_for_labeling(keys, _qs(), n=5) and len(a) == 5
     assert all(k[0] != "u" for k in a)
+
+
+def test_sample_is_balanced_across_systems() -> None:
+    keys = [(q, s) for q in _qs() for s in ("S0", "S1", "S2", "S3")]
+    a = sample_for_labeling(keys, _qs(), n=8)
+    assert Counter(s for _, s in a) == {"S0": 2, "S1": 2, "S2": 2, "S3": 2}
 
 
 def test_label_loop_resumes_and_agreement(tmp_path: Path) -> None:
