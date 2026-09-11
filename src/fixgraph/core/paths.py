@@ -1,4 +1,8 @@
-"""Filesystem locations. Always pathlib, never string concatenation (spec §5.8)."""
+"""Filesystem locations. Always pathlib, never string concatenation (spec §5.8).
+
+REPO_ROOT, configs/ and `DataPaths` (every file under data/). Used by core.config (exposed to
+the rest of the code as `settings.paths`) and core.ontology. No fixgraph imports.
+"""
 
 from dataclasses import dataclass
 from pathlib import Path

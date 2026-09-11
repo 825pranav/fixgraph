@@ -1,4 +1,9 @@
-"""Settings: init kwargs > environment > .env > configs/base.yaml > defaults."""
+"""Settings: init kwargs > environment > .env > configs/base.yaml > defaults.
+
+`load_settings()` is the single entry point: every CLI (cli.py, ingest/kg/gnn/bench cli.py) and
+api/app.py call it; llm/factory.py reads the LLM section to pick a backend.
+Uses: core.paths (repo root, default config file, DataPaths).
+"""
 
 from pathlib import Path
 from typing import Literal

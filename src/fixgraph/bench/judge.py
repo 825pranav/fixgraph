@@ -1,5 +1,9 @@
 """Correctness judge (spec §11.3): rubric score 0 / 0.5 / 1 against the gold answer + key-fact
-coverage. Run with the judge model (qwen3:8b); validated against human labels (§11.4)."""
+coverage. Run with the judge model (qwen3:8b); validated against human labels (§11.4).
+
+Used by: bench/run.py (judge stage).
+Uses: bench.schema.Question, llm.structured.complete_structured.
+"""
 
 from pydantic import BaseModel, Field
 

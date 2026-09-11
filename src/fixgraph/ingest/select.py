@@ -2,6 +2,9 @@
 
 Keeps articles about the target product families that look like troubleshooting or how-to
 content, ranked by a transparent keyword score. Deterministic (ties broken by article id).
+
+Used by: `fixgraph ingest parse | subset` (ingest/cli.py).
+Uses: core.models.Article, core.ontology (product families).
 """
 
 import re

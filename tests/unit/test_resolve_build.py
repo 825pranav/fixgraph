@@ -1,3 +1,8 @@
+"""Entity resolution, KG build provenance/merging, graph stats and gold-set evaluation.
+
+Covers kg/resolve.py, kg/build.py and kg/quality.py (fake embedder, no GPU).
+"""
+
 import json
 from collections import Counter
 

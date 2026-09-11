@@ -1,3 +1,8 @@
+"""Extraction prompt/schema, graph conversion, validation rejections and the resumable runner.
+
+Covers kg/extraction.py, kg/validation.py, kg/schema.py and kg/run_extract.py (fake LLM).
+"""
+
 import json
 from pathlib import Path
 

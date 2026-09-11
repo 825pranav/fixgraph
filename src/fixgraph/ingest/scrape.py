@@ -2,6 +2,8 @@
 
 robots.txt is obeyed, requests are rate-limited to <= 1/s with a descriptive User-Agent, and raw
 HTML is cached under data/raw/html so reruns only fetch what's missing.
+
+Used by: `fixgraph ingest scrape` (ingest/cli.py). Uses httpx only; no fixgraph imports.
 """
 
 import logging

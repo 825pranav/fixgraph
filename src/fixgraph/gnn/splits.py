@@ -6,6 +6,9 @@ passing in both directions. Training supervision edges are disjoint from trainin
 edges (disjoint_train_ratio), so the model never sees a supervised edge in its input graph.
 
 Transductive: PyG RandomLinkSplit with rev_edge_types (secondary).
+
+Used by: gnn/cli.py (`gnn train`).
+Uses: gnn.data (GraphData, message_graph, TARGET / REV_TARGET).
 """
 
 import random

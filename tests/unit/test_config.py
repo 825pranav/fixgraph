@@ -1,3 +1,8 @@
+"""Settings precedence (YAML defaults, env overrides) and LLM client construction.
+
+Covers core/config.py and llm/factory.py.
+"""
+
 from pathlib import Path
 
 import pytest

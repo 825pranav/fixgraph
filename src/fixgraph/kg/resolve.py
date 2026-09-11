@@ -8,6 +8,9 @@
 3. Optional LLM adjudication for borderline cluster pairs (similarity within a band below the
    threshold), cached.
 4. Every merge decision is logged.
+
+Used by: kg.build (canonicalization), kg/cli.py (`llm_adjudicator` for `kg build`).
+Uses: core.ontology, embeddings, kg.validation.normalize, llm.structured.
 """
 
 import hashlib

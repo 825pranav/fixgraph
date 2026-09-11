@@ -1,3 +1,8 @@
+"""Personalized PageRank matches networkx (property-based), incl. dangling nodes and no seeds.
+
+Covers retrieval/ppr.py.
+"""
+
 import networkx as nx
 import numpy as np
 from hypothesis import given, settings

@@ -1,4 +1,8 @@
-"""Cross-encoder reranking behind a protocol (real model or a lexical fake for tests)."""
+"""Cross-encoder reranking behind a protocol (real model or a lexical fake for tests).
+
+Used by: retrieval.hybrid (final stage of S1-S3); built by bench/cli.py and api/app.py.
+Uses: retrieval.bm25 (tokenizer for LexicalReranker).
+"""
 
 import gc
 import logging

@@ -1,4 +1,8 @@
-"""SQLite response cache keyed on (model, prompt, params). Makes long jobs resumable."""
+"""SQLite response cache keyed on (model, prompt, params). Makes long jobs resumable.
+
+`CachedLLMClient` wraps any LLMClient; llm.factory applies it by default (`use_cache=True`).
+Uses: llm.base.
+"""
 
 import hashlib
 import json

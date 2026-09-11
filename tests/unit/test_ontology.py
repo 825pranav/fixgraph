@@ -1,3 +1,8 @@
+"""Rule-based matchers: product families, products, OS versions, components and features.
+
+Covers core/ontology.py against configs/ontology.yaml.
+"""
+
 import pytest
 
 from fixgraph.core.ontology import Ontology, load_ontology, parse_os_version

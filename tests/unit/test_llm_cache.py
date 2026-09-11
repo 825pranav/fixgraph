@@ -1,3 +1,8 @@
+"""SQLite response cache: stable keys, cache hits, persistence across reopen, unicode.
+
+Covers llm/cache.py.
+"""
+
 from pathlib import Path
 
 from fixgraph.llm import CachedLLMClient, ChatMessage, FakeLLMClient, LLMRequest, SQLiteCache

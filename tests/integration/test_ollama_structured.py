@@ -1,4 +1,8 @@
-"""Opt-in: needs Ollama running with the extraction model pulled. `uv run poe test-integration`."""
+"""Opt-in: needs Ollama running with the extraction model pulled. `uv run poe test-integration`.
+
+Checks that the real Ollama backend returns schema-valid JSON through complete_structured
+(llm.ollama, llm.structured, core.config).
+"""
 
 import pytest
 from pydantic import BaseModel

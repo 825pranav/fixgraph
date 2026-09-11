@@ -1,4 +1,7 @@
-"""KG schema (spec §7): node labels, relation types, and head/tail type constraints."""
+"""KG schema (spec §7): node labels, relation types, and head/tail type constraints.
+
+Used by: kg.validation (`relation_allowed` rejects type-violating relations). No fixgraph imports.
+"""
 
 from typing import Literal, get_args
 

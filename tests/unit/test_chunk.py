@@ -1,3 +1,7 @@
+"""Chunking invariants (property-based): exact offsets, full coverage, determinism, size bounds,
+merge/split rules. Covers ingest/chunk.py.
+"""
+
 from hypothesis import given, settings
 from hypothesis import strategies as st
 

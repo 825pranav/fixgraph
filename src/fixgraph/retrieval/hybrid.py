@@ -1,4 +1,8 @@
-"""S1: hybrid RAG = Qdrant dense + BM25 sparse, reciprocal-rank fusion, cross-encoder rerank."""
+"""S1: hybrid RAG = Qdrant dense + BM25 sparse, reciprocal-rank fusion, cross-encoder rerank.
+
+Used by: bench/cli.py (S1, and as the fallback inside S2/S3), retrieval.graphrag, api/app.py.
+Uses: retrieval.index (chunk collection), retrieval.bm25, retrieval.rerank, embeddings.
+"""
 
 import time
 

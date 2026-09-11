@@ -1,4 +1,10 @@
-"""Seed ontology loader and rule-based matchers (products, OS versions, components, features)."""
+"""Seed ontology loader and rule-based matchers (products, OS versions, components, features).
+
+Loads configs/ontology.yaml. Used by: ingest.parse and ingest.select (product tagging, corpus
+choice), kg.extraction / kg.run_extract / kg.resolve / kg.build (normalization, seed
+edges), retrieval.linking (rule-based mentions), and the ingest/kg/bench CLIs.
+Uses: core.paths.
+"""
 
 import re
 from functools import cached_property

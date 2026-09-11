@@ -10,6 +10,10 @@ Rules:
    stays within `max_tokens`; a tiny final section (< TINY_TOKENS) merges backward instead.
 3. A group above `max_tokens` is split at unit (paragraph/step) boundaries, repeating
    `overlap_units` units between consecutive windows.
+
+Used by: `fixgraph ingest chunk` (ingest/cli.py); answer.grounded reuses `count_tokens` for its
+context budget.
+Uses: core.models (Article, Chunk).
 """
 
 import re

@@ -5,6 +5,9 @@
 - node -> chunks (mentions + edge provenance) and chunk -> nodes maps for PPR scoring.
 - Only `origin == "extracted"` edges are evidence; predicted edges (GNN, S4) can be added as
   routing-only edges and are tracked separately so they never become citations.
+
+Used by: bench/cli.py (`build_graph_index` for S2/S3), retrieval.graphrag.
+Uses: kg.store.KG.
 """
 
 from collections import defaultdict

@@ -1,4 +1,7 @@
-"""Client for any OpenAI-compatible /v1/chat/completions endpoint (vLLM, hosted, Ollama /v1)."""
+"""Client for any OpenAI-compatible /v1/chat/completions endpoint (vLLM, hosted, Ollama /v1).
+
+Used by: llm.factory for any backend other than `ollama` / `fake`. Uses: llm.base, httpx.
+"""
 
 import time
 from typing import Any

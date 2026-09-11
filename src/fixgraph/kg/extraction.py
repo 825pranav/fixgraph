@@ -1,13 +1,15 @@
 """Schema-constrained triple extraction from chunks (spec §8.1).
 
-Single source of truth for the prompt and output schema: the local Ollama runner and the
-optional Kaggle/vLLM script (scripts/kaggle_extract.py) both import from here.
+Single source of truth for the prompt and output schema: the extraction runner
+(kg.run_extract) and the validator (kg.validation) import them from here.
 
 Prompt v2 (see DECISIONS.md D13): the model fills a *problem-centric nested* schema
 (product -> problems -> causes/fixes) instead of an entity list plus index-based relations.
 Relation types follow from where a string sits in the JSON, so type violations are impossible
 by construction; `to_graph` converts deterministically into typed entities and relations.
 Every string must be copied from the chunk, and validation fuzzy-grounds it there.
+
+Uses: core.models.Chunk, core.ontology, llm.base (request types).
 """
 
 from pydantic import BaseModel, Field

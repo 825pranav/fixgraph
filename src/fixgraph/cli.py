@@ -1,4 +1,10 @@
-"""FixGraph command-line interface (spec §12.4). Stages are added milestone by milestone."""
+"""FixGraph command-line interface (spec §12.4). Stages are added milestone by milestone.
+
+Root Typer app, installed as the `fixgraph` console script (pyproject [project.scripts]).
+Mounts the sub-apps `ingest` (ingest/cli.py), `kg` (kg/cli.py), `gnn` (gnn/cli.py), `index` and
+`bench` (bench/cli.py), and defines `version`, `llm smoke` and `serve` (api/app.py via uvicorn).
+Uses: core.config.load_settings, llm.factory.build_llm_client.
+"""
 
 import logging
 

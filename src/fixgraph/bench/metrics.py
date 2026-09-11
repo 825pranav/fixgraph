@@ -7,6 +7,8 @@ Definitions (also in DECISIONS.md):
 - citation recall: share of gold support chunks that the answer cites.
 - unsupported-claim rate: share of answer sentences the verifier labels unsupported.
 - abstention: precision/recall of "abstained" against "question is unanswerable".
+
+Used by: bench/run.py (report stage). No fixgraph imports.
 """
 
 from collections.abc import Sequence

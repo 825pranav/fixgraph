@@ -9,6 +9,10 @@ the paths are serialized as navigation hints for the answer model.
 
 Both fall back to the hybrid (S1) candidates when no seed can be linked, and report it.
 Predicted (GNN) edges only change routing; their provenance never becomes evidence.
+
+Used by: bench/cli.py (builds PPRRetriever / PathRetriever for `bench run`).
+Uses: retrieval.linking (seeds), retrieval.graph (GraphIndex), retrieval.ppr,
+retrieval.hybrid (candidates, fallback, reranker), retrieval.base.
 """
 
 import time

@@ -1,3 +1,8 @@
+"""Parquet round-trip of articles/chunks and corpus selection.
+
+Covers ingest/store.py and ingest/select.py (relevance ranking, chunk-budget subsetting).
+"""
+
 from pathlib import Path
 
 from fixgraph.core.models import Article, ArticleSection, TextUnit

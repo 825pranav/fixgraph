@@ -3,6 +3,10 @@
 Every edge carries provenance: source_chunk_ids, extraction_model, extraction_confidence (max
 over supporting mentions), extracted_at (earliest), origin. Ontology-derived edges (IN_FAMILY
 and seed DEPENDS_ON) are marked with extraction_model="ontology".
+
+Used by: `fixgraph kg build` (kg/cli.py), which writes the result with kg.store.write_kg.
+Uses: kg.run_extract (ExtractionRecord input), kg.resolve (canonicalization), kg.store
+(schemas), core.ontology, embeddings.
 """
 
 import hashlib

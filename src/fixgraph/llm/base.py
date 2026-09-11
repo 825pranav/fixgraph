@@ -1,4 +1,9 @@
-"""LLMClient protocol and the request/response models every backend speaks."""
+"""LLMClient protocol and the request/response models every backend speaks.
+
+Implemented by llm.ollama, llm.openai_compat, llm.fake and wrapped by llm.cache. Every LLM
+caller (kg extraction/resolve, retrieval.linking, answer, bench judge/generate) codes against
+this protocol only. No fixgraph imports.
+"""
 
 from typing import Any, Literal, Protocol, runtime_checkable
 

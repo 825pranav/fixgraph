@@ -1,4 +1,8 @@
-"""Graph quality evaluation (spec §8.3): gold-set P/R/F1 per type and graph statistics."""
+"""Graph quality evaluation (spec §8.3): gold-set P/R/F1 per type and graph statistics.
+
+Used by: `fixgraph kg stats | eval` (kg/cli.py); kg.annotate reuses the GoldChunk format.
+Uses: kg.validation (ValidatedExtraction, normalize), kg.store.KG.
+"""
 
 from collections import Counter, defaultdict
 from difflib import SequenceMatcher

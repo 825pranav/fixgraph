@@ -5,6 +5,9 @@ homogeneous graph, DistMult (plain PyTorch, all relations). Main: to_hetero(Grap
 with a dot-product decoder, trained full-batch with BCE on sampled negative Fix nodes.
 
 Every scorer returns a [len(symptoms), num_fix] score matrix so evaluation is shared.
+
+Used by: gnn/cli.py (`gnn train | gaps`); scored by gnn.evaluate.
+Uses: gnn.data (TARGET edge type).
 """
 
 import logging
