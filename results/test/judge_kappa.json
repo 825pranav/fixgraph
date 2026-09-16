@@ -1,0 +1,7 @@
+{
+  "n": 99,
+  "kappa": 0.376,
+  "exact_agreement": 0.566,
+  "judge_mean": 0.545,
+  "human_mean": 0.672
+}

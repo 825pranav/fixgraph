@@ -1,0 +1,191 @@
+{"qid": "t032", "decision": "keep", "reason": "Carrier settings, Dual SIM eligibility and company/carrier support are all stated in the eSIM chunks."}
+{"qid": "t045", "decision": "keep", "reason": "'Put both AirPods in the charging case' appears in both the won't-connect and replacement-case articles; minimal but supported."}
+{"qid": "t049", "decision": "keep", "reason": "Unpair then pair again is recommended in both the stuck-on-logo and not-paired articles."}
+{"qid": "t055", "decision": "reject", "reason": "'Locate your device on your computer' is an intermediate step, not a fix; Error 53 article covers iPhone/iPad, not iPod touch."}
+{"qid": "t060", "decision": "keep", "reason": "Both blank-screen and question-mark articles recommend repairing the startup disk with Disk Utility in Recovery."}
+{"qid": "t064", "decision": "reject", "reason": "Connecting to a computer is a Zoom-off step and a USB hotspot connection method, not a fix for failing to connect to Personal Hotspot."}
+{"qid": "t071", "decision": "keep", "reason": "Allow Others to Join is stated in both the Wi-Fi hotspot troubleshooting and connect-to-hotspot articles."}
+{"qid": "t076", "decision": "reject", "reason": "Evidence for app downloads is the Mac article, but the question says the iPhone can't download apps."}
+{"qid": "t087", "decision": "reject", "reason": "'Connect to a computer' alone is only the first step of recovery mode for the iPad; misleadingly incomplete as a fix."}
+{"qid": "t091", "decision": "keep", "reason": "Turning iMessage off and back on is in both the Messages article and the iOS 26 eSIM activation section."}
+{"qid": "t096", "decision": "keep", "reason": "Both the keyboard article and Pixelmator Pro for iPad article recommend updating iPadOS."}
+{"qid": "t102", "decision": "keep", "reason": "Connecting to Wi-Fi is recommended in both the activation and slow-download articles."}
+{"qid": "t108", "decision": "reject", "reason": "'Open the Watch app' is a trivial navigation step, not a fix; the Wrist Detection chunk is a measurements article, not a symptom fix."}
+{"qid": "t114", "decision": "keep", "reason": "Checking the internet connection is stated in both the can't-send-email and Siri articles."}
+{"qid": "t121", "decision": "keep", "reason": "The Apple TV article says to update the iPhone to iOS 17 or later; the bookmarks key fact is an off-path graph artifact but the answer holds."}
+{"qid": "t132", "decision": "reject", "reason": "Key fact 'REQUIRES macOS 14.1' comes from an unrelated camera article; the smart card article says macOS Catalina 10.15.4 and lists more steps."}
+{"qid": "t156", "decision": "reject", "reason": "The 'iPhone DEPENDS_ON car' dependency is irrelevant; the question treats getting the verification code as a symptom and is incoherent."}
+{"qid": "t164", "decision": "reject", "reason": "The cross-device dependency (iPhone DEPENDS_ON Mac) isn't stated in the evidence; the Mac chunk is an unrelated hotspot article."}
+{"qid": "t174", "decision": "reject", "reason": "The answer only addresses the iPhone update alert; nothing covers the Apple Watch not updating, though the evidence has watch steps."}
+{"qid": "t001", "decision": "keep", "reason": "Activating on iPhone, activating online and turning iMessage/FaceTime off and on are all in the evidence."}
+{"qid": "t012", "decision": "keep", "reason": "Focus settings, Phone app settings and Silent mode off are all stated."}
+{"qid": "t016", "decision": "keep", "reason": "The location settings on Watch and iPhone are stated for Optimized Battery Charging location behavior."}
+{"qid": "t022", "decision": "reject", "reason": "Format/reset advice is from the 'don't see Import' section; the 'can't import some content' section blames incompatible or edited files."}
+{"qid": "t027", "decision": "keep", "reason": "Discovery mode, Bluetooth settings and Accessibility > Hearing Devices are all stated."}
+{"qid": "t034", "decision": "reject", "reason": "Omits the actual fix (tap the charging icon, then Charge to Full Now); the answer just implies waiting."}
+{"qid": "t145", "decision": "keep", "reason": "Login Items & Extensions with macOS Sequoia 15 or later is stated in the same system extension article."}
+{"qid": "t181", "decision": "keep", "reason": "The general update/restore error article, whose error list includes Error 17, recommends checking computer security software."}
+{"qid": "t187", "decision": "keep", "reason": "Bypassing the router and connecting directly to the modem is stated in the Error 3194 article."}
+{"qid": "t010", "decision": "keep", "reason": "Erase watch, open Apple Watch app on new iPhone and pair again are stated in the new-iPhone article."}
+{"qid": "t053", "decision": "reject", "reason": "'Needs newer iOS' is a restore requirement, not a symptom, and nothing says updating fixes the app microphone issue."}
+{"qid": "t069", "decision": "keep", "reason": "The iPhone update-error article says to update the Mac, and the Photomator article says to update macOS if unsupported."}
+{"qid": "t079", "decision": "reject", "reason": "In the Error 53 article, force restart is only for getting past the Apple logo before Restore, not a fix for Error 53."}
+{"qid": "t085", "decision": "reject", "reason": "Tracking permission (iPhone) and Photomator photo-library access (Mac) are unrelated Privacy settings; 'resolves both' is contrived."}
+{"qid": "t103", "decision": "keep", "reason": "Both the Photomator and Pixelmator Pro articles say to check media compatibility, with the stated shortcuts."}
+{"qid": "t115", "decision": "reject", "reason": "The iPhone side draws on an unrelated Personal Hotspot article, and 'connect to a computer' is not a fix for a frozen device."}
+{"qid": "t124", "decision": "reject", "reason": "macOS 14.1 comes from an unrelated camera article; the Touch ID article sets no such requirement for restarting."}
+{"qid": "t130", "decision": "reject", "reason": "The iOS 26 requirement is from the eSIM-activation section, and the answer never addresses the version question asked."}
+{"qid": "t135", "decision": "reject", "reason": "The question names the answer (restart), and macOS 14.1 comes from an unrelated camera article, not the Pixelmator Pro article."}
+{"qid": "t139", "decision": "reject", "reason": "iPadOS 14.5 comes from the Magic Keyboard article; Pixelmator Pro for iPad requires iPadOS 26."}
+{"qid": "t143", "decision": "keep", "reason": "Update Pixelmator Pro for iPad and the iPadOS 26 requirement are in the same article (the question leads somewhat)."}
+{"qid": "t157", "decision": "reject", "reason": "The cross-device dependency (iPhone DEPENDS_ON Mac) isn't in the evidence; the Mac chunk is an unrelated hotspot article."}
+{"qid": "t166", "decision": "reject", "reason": "Marking as lost doesn't make the device appear; the evidence says it won't appear if Find My was off, and the Mac dependency isn't stated."}
+{"qid": "t171", "decision": "reject", "reason": "Clicking Allow on a computer is a USB-to-computer step and doesn't address an iPad joining the iPhone's hotspot."}
+{"qid": "t000", "decision": "keep", "reason": "Junk mailbox, blocked senders and mail rules are all stated."}
+{"qid": "t006", "decision": "reject", "reason": "The Control Center modes and fit tips are for gestures not being recognized, the opposite problem; only turning Gestures off applies."}
+{"qid": "t020", "decision": "keep", "reason": "Storage device format, library location and Privacy & Security checks are all stated in the iMovie article."}
+{"qid": "t035", "decision": "keep", "reason": "The alert-messages section says to delete content manually if you need more space; thin but supported."}
+{"qid": "t149", "decision": "reject", "reason": "The answer says Catalina 10.15/Finder is required, but the evidence says Mojave or earlier can use iTunes and a PC works too."}
+{"qid": "t042", "decision": "keep", "reason": "Both the iMovie and Photomator Mac articles recommend disconnecting all external devices except keyboard and mouse."}
+{"qid": "t046", "decision": "keep", "reason": "The update/restore article says restore the device and the Error 110 article says try restoring again; borderline because the fix is close to the stated symptom."}
+{"qid": "t050", "decision": "reject", "reason": "The gold answer 'Locate your device on your computer' is one intermediate step, not a fix, so it is badly incomplete and misleading."}
+{"qid": "t056", "decision": "reject", "reason": "The question is about an iPhone that can't download apps, but the evidence is the Mac App Store article; nothing supports the iPhone case."}
+{"qid": "t061", "decision": "reject", "reason": "The update evidence (the not-enough-storage article) never recommends pairing with a new iPhone as a fix for a failed update."}
+{"qid": "t065", "decision": "keep", "reason": "The Home Screen and Lock Screen articles both say to turn off Zoom in Settings > Accessibility > Zoom."}
+{"qid": "t072", "decision": "reject", "reason": "Turning off Optimized Charge Limit is not a problem to fix, and neither article says it fixes fast battery drain; the question is contrived and the answer mixes the two."}
+{"qid": "t080", "decision": "reject", "reason": "Deleting content only fixes the need-more-space issue; the alert-messages section never recommends it."}
+{"qid": "t088", "decision": "keep", "reason": "The can't-send and can't-receive articles both recommend removing the email account and adding it again."}
+{"qid": "t092", "decision": "keep", "reason": "The messages article says to unpair and re-pair, and the Unable to Verify Update article says to unpair and then update."}
+{"qid": "t097", "decision": "keep", "reason": "The stolen-Mac and stolen-iPhone articles both say to change your Apple Account password."}
+{"qid": "t105", "decision": "keep", "reason": "The Photomator Mac and Pixelmator Pro iPad articles both recommend disconnecting external devices."}
+{"qid": "t109", "decision": "reject", "reason": "The question is contrived (a tracking prompt is not a malfunction) and the iMovie privacy settings only apply to photo library, mic, or camera access; the vague gold answer does not fix 'iMovie isn't working'."}
+{"qid": "t117", "decision": "reject", "reason": "Connecting by USB is a preliminary step in both articles, not a fix; the gold answer is badly incomplete."}
+{"qid": "t123", "decision": "reject", "reason": "The gold says 'iPhone or iPad', but the Apple TV article requires an iPhone with iOS 17, and the key fact wrongly ties the fix to the unrelated SOS article."}
+{"qid": "t152", "decision": "reject", "reason": "No evidence states the iPhone-Mac dependency (the Personal Hotspot chunk is unrelated); the cross_device link is invented."}
+{"qid": "t159", "decision": "reject", "reason": "The gold only describes what happens when AirPods get warm (charging slows), offers no fix, ignores the Mac connection issue, and no dependency is stated."}
+{"qid": "t165", "decision": "reject", "reason": "The question is contrived ('restarting it with my Mac') and the evidence states no iPhone-Mac dependency (the hotspot chunk is unrelated)."}
+{"qid": "t176", "decision": "reject", "reason": "The Mac-iPhone/Apple ID dependency is irrelevant to the blank-screen fix, and the cross_device link is not supported."}
+{"qid": "t003", "decision": "keep", "reason": "Both steps are stated in the USB Devices Disabled article."}
+{"qid": "t013", "decision": "keep", "reason": "All steps and key facts are stated in the Apple TV recovery article."}
+{"qid": "t017", "decision": "keep", "reason": "The SACL dscl step, the directory binding, and the read/write ACL check are all in the SMB article."}
+{"qid": "t023", "decision": "keep", "reason": "The answer is stated verbatim in the iMessage/FaceTime article section."}
+{"qid": "t028", "decision": "keep", "reason": "The reset steps (hold 15 seconds, amber then white, lid open, follow on-screen steps) match the AirPods reset article; borderline because that section is about the status light not flashing white."}
+{"qid": "t037", "decision": "keep", "reason": "All three key facts are stated in the can't-send-email article."}
+{"qid": "t147", "decision": "keep", "reason": "The Mac Pro (2023) article says to update to macOS Ventura 13.5 or later."}
+{"qid": "t183", "decision": "keep", "reason": "The error 9/4005/4013/4014 article says to check for updates to your Mac or PC."}
+{"qid": "t188", "decision": "keep", "reason": "The error 9/4005/4013/4014 article says to check for updates to your Mac or PC."}
+{"qid": "t040", "decision": "reject", "reason": "Turning off Zoom via Finder/iTunes comes only from the Zoom article; the iPad-won't-turn-on article never recommends it."}
+{"qid": "t059", "decision": "reject", "reason": "The Error 3194/network article never recommends updating via Mac or iTunes as the fix; only the won't-update article does."}
+{"qid": "t075", "decision": "keep", "reason": "Both articles recommend turning on iCloud Keychain; borderline because the gold names only the Mac and Vision Pro, while the AirPods case needs it on the iPhone."}
+{"qid": "t082", "decision": "keep", "reason": "The can't-update (storage) article and the messages article both recommend unpairing the Apple Watch."}
+{"qid": "t094", "decision": "reject", "reason": "The microphone evidence is about a headphone mic, not the iPhone's microphone, and 'contact Apple Support' is a generic fallback, not a fix."}
+{"qid": "t104", "decision": "keep", "reason": "The call-failure and SOS articles both say to contact your carrier."}
+{"qid": "t116", "decision": "reject", "reason": "NVRAM reset is Intel-only and part of external-device testing in the Photomator article, and only a niche step in the question-mark article; the gold drops these caveats and is misleading."}
+{"qid": "t125", "decision": "reject", "reason": "The Apple TV article requires iOS 17, not iOS 11 (which comes from an unrelated bookmarks article), and does not mention iPad."}
+{"qid": "t131", "decision": "reject", "reason": "The macOS 14.1 requirement comes from an unrelated camera article; the App Store article states no version."}
+{"qid": "t136", "decision": "reject", "reason": "The key fact 'macOS 10.12.6' comes from the bookmarks article (Photomator requires Ventura 13), and the question names the answer."}
+{"qid": "t140", "decision": "reject", "reason": "The macOS 14.1 requirement comes from an unrelated camera article, and the question names the answer."}
+{"qid": "t150", "decision": "reject", "reason": "No evidence says Apple Watch syncs bookmarks or that iPhone depends on the Watch for it; copy/export applies only to devices that can't update."}
+{"qid": "t158", "decision": "reject", "reason": "The gold (reset iPhone to redo Android setup) has nothing to do with the Apple Watch update issue in the question."}
+{"qid": "t168", "decision": "reject", "reason": "Deleting content is for the need-more-space issue, not alert messages; CarPlay is ignored and no dependency is stated."}
+{"qid": "t172", "decision": "reject", "reason": "The Apple Watch sync issue is not addressed and no iPhone-Watch dependency relevant to the backup password is stated."}
+{"qid": "t002", "decision": "keep", "reason": "Clean, check for water and dry, and restart are all steps in the Apple Watch mic/speaker article."}
+{"qid": "t009", "decision": "reject", "reason": "The gold is essentially a link ('Learn about Activation Lock') and omits the actual guidance that the previous owner must remove it."}
+{"qid": "t025", "decision": "reject", "reason": "The gold omits the key step 'Remove This Device' and the reopening of the case, and puts the steps in the wrong order, so it is misleading."}
+{"qid": "t036", "decision": "keep", "reason": "Both steps are stated in the Apple Watch side button article."}
+{"qid": "t182", "decision": "keep", "reason": "Bypassing the router and connecting via Ethernet are stated steps for Error 3194 in the network-errors article."}
+{"qid": "t043", "decision": "reject", "reason": "Gold answer is only an intermediate step ('Locate your device'); the actual fix (recovery mode update/restore) is missing, so the answer is misleadingly incomplete."}
+{"qid": "t047", "decision": "reject", "reason": "Not a clear question, and the Wi-Fi article never says 'stay connected to Wi-Fi' fixes a Wi-Fi connection failure; the answer is circular for that symptom."}
+{"qid": "t051", "decision": "keep", "reason": "Both articles say to use Disk Utility in Recovery to repair the startup disk."}
+{"qid": "t057", "decision": "keep", "reason": "Both iMovie and Pixelmator Pro articles recommend disconnecting external devices except keyboard and mouse."}
+{"qid": "t062", "decision": "reject", "reason": "'Tap General' is a trivial navigation step, not a fix, and serves unrelated purposes in the two articles."}
+{"qid": "t066", "decision": "keep", "reason": "Both the eSIM and call-failure articles recommend contacting the carrier (the Dual SIM detail only applies to eSIM, a minor overreach)."}
+{"qid": "t073", "decision": "keep", "reason": "Both Home Screen and Lock Screen articles say to turn off Zoom in Settings."}
+{"qid": "t081", "decision": "keep", "reason": "Passcode prompt section says erase the watch; new-iPhone pairing article also starts with erasing the watch."}
+{"qid": "t089", "decision": "keep", "reason": "Both the call-failure and SOS/No Service articles recommend checking for a carrier settings update."}
+{"qid": "t093", "decision": "keep", "reason": "Bookmarks article says to update the Mac and Photomator article says to update macOS if unsupported."}
+{"qid": "t099", "decision": "keep", "reason": "Both the Wi-Fi-no-internet and Safari articles recommend checking VPN or security software."}
+{"qid": "t106", "decision": "reject", "reason": "Update macOS appears only in the Personal Hotspot USB section; no evidence ties it to the Wi-Fi hotspot connection symptom in the question."}
+{"qid": "t110", "decision": "keep", "reason": "Both the Apple Watch messages and iPhone app articles recommend checking for updates."}
+{"qid": "t119", "decision": "keep", "reason": "Both the email and Siri articles say to make sure the device is connected to the internet."}
+{"qid": "t127", "decision": "keep", "reason": "Finder/iTunes Configure Accessibility steps to turn off Zoom are stated in the Lock Screen article (simpler Settings route omitted but not misleading)."}
+{"qid": "t154", "decision": "reject", "reason": "Cross-device dependency (Mac depends on iPhone) is not stated in any evidence; the iPhone premise is invented."}
+{"qid": "t160", "decision": "reject", "reason": "No evidence of an AirPods-iPhone dependency; the iPhone-vs-iPad premise is nonsensical and the temperature fix is unrelated to it."}
+{"qid": "t167", "decision": "reject", "reason": "Claimed iPhone-depends-on-Mac dependency is not in evidence and the question is not actually cross-device."}
+{"qid": "t177", "decision": "reject", "reason": "iPad-car dependency is irrelevant to the Restore screen fix and not stated as a dependency in evidence."}
+{"qid": "t007", "decision": "reject", "reason": "Gold answer garbles the sequence (tap notification after Identify Found Item) and omits holding the iPhone near the AirTag, which is what produces the notification."}
+{"qid": "t014", "decision": "keep", "reason": "All three methods are listed verbatim in the SMB/Open Directory article."}
+{"qid": "t019", "decision": "keep", "reason": "iCloud.com/find, select watch, Lost Mode and phone number steps are all in the evidence."}
+{"qid": "t024", "decision": "keep", "reason": "All three unlock options are stated in the lost/stolen Mac article (Intel no-T2 qualifier omitted, minor)."}
+{"qid": "t029", "decision": "reject", "reason": "Choosing a network from the Wi-Fi menu does not answer 'connected to Wi-Fi but no internet'; the evidence routes that case to a different article."}
+{"qid": "t038", "decision": "keep", "reason": "Connect via USB, click Update, and force restart if stuck are all in the Error 53 article."}
+{"qid": "t148", "decision": "keep", "reason": "macOS 14 Sonoma requirement and system-requirements tip come from the same Vision Pro article."}
+{"qid": "t184", "decision": "keep", "reason": "Error 53 article says to click Update to reinstall without erasing data."}
+{"qid": "t189", "decision": "keep", "reason": "General update/restore error article (which lists Error 9) recommends checking computer security software."}
+{"qid": "t041", "decision": "reject", "reason": "Hotspot article never recommends 'connect to a Wi-Fi network' as a fix for failing to join a Personal Hotspot; fix only applies to slow downloads."}
+{"qid": "t067", "decision": "keep", "reason": "Both the Mail and Wi-Fi-no-internet articles recommend updating macOS."}
+{"qid": "t077", "decision": "reject", "reason": "'Charge to Full Now' is only the Apple Watch step; the iPhone Clean Energy override is 'Charge Now' via the Lock Screen notification."}
+{"qid": "t083", "decision": "keep", "reason": "Both the Mac charging and device-recognition articles say to try another USB cable that supports charging/data."}
+{"qid": "t098", "decision": "keep", "reason": "Check-system-requirements step and all three stated versions appear in the Photomator Mac/iPad and Pixelmator Pro Mac articles."}
+{"qid": "t111", "decision": "keep", "reason": "Both the forgot-passcode and Android-migration articles resolve by resetting the iPhone."}
+{"qid": "t118", "decision": "keep", "reason": "Mac USB-C charging article (step 8) and iPhone app article both recommend checking for updates."}
+{"qid": "t126", "decision": "reject", "reason": "macOS 14.1 comes from the unrelated camera article; the Photomator article states no such requirement."}
+{"qid": "t133", "decision": "reject", "reason": "macOS 14.1 requirement comes from the unrelated camera article, not the forgot-password article."}
+{"qid": "t137", "decision": "reject", "reason": "macOS 14.1 requirement comes from the unrelated camera article, not the Mac app article."}
+{"qid": "t141", "decision": "reject", "reason": "macOS 14.1 requirement comes from the unrelated camera article, not the iMovie article."}
+{"qid": "t151", "decision": "reject", "reason": "Evidence says turning on Bluetooth is needed to receive tracking alerts, not stop them; Mac dependency also unsupported."}
+{"qid": "t161", "decision": "reject", "reason": "Fast-connection advice is for FaceTime, not iPhone calls with Apple Watch; no dependency stated in evidence."}
+{"qid": "t169", "decision": "reject", "reason": "Passcode Reset requires a powered-on device (contradicts 'won't turn on'), iOS 17 condition omitted, and the claimed device dependency is unsupported."}
+{"qid": "t175", "decision": "reject", "reason": "Not a clear question, the Mac network-settings symptom is unaddressed, and no iPhone-Mac dependency is stated in evidence."}
+{"qid": "t004", "decision": "keep", "reason": "Check Wi-Fi connection, date and time, and VPN/security software are all in the Mac Wi-Fi internet article."}
+{"qid": "t011", "decision": "reject", "reason": "Evidence only links to another article; 'follow the on-screen instructions' is not stated and gives no real fix."}
+{"qid": "t031", "decision": "keep", "reason": "Clean AirPods, ANC on, and Adaptive Audio off are all in the ANC article."}
+{"qid": "t144", "decision": "keep", "reason": "Vision Pro article says to update so spatial photos appear in 3D (visionOS 2)."}
+{"qid": "t185", "decision": "keep", "reason": "Error 110 article says to try restoring the device again."}
+{"qid": "t044", "decision": "reject", "reason": "Deleting content is the fix for needing more space; the alert-messages section only says 'get help', so the fix does not apply to both symptoms."}
+{"qid": "t048", "decision": "keep", "reason": "Both the backup/restore article and the restore-error article say to make sure the Mac is up to date."}
+{"qid": "t054", "decision": "reject", "reason": "The Personal Hotspot article never recommends connecting to a reliable Wi-Fi network; only the activation article does."}
+{"qid": "t058", "decision": "reject", "reason": "For the status light not flashing white, the fix is holding the setup button or double-tapping the case; 'open lid and follow on-screen instructions' leaves out the actual reset step and is misleading."}
+{"qid": "t063", "decision": "keep", "reason": "Both the camera article and the Mac-won't-turn-on article recommend resetting the SMC on Intel Macs."}
+{"qid": "t070", "decision": "keep", "reason": "Both the blank-screen and prohibitory-symbol articles say to repair the startup disk with Disk Utility in Recovery."}
+{"qid": "t074", "decision": "reject", "reason": "The generic 'go to Settings to check software update connection' is stitched together; neither article frames it as a shared fix, and 'check software update connection' is not stated."}
+{"qid": "t086", "decision": "keep", "reason": "Both the storage/can't-update article and the Unable to Verify Update article recommend unpairing the watch."}
+{"qid": "t090", "decision": "keep", "reason": "Both the eSIM and SOS articles recommend contacting the carrier; the Dual SIM eligibility check comes from the eSIM article."}
+{"qid": "t095", "decision": "reject", "reason": "The battery article only advises keeping the watch within range of its paired iPhone (not an iPad) for efficiency; tying it to the red-'!' restore step is coincidental and the restore steps are left out."}
+{"qid": "t101", "decision": "keep", "reason": "Both the Photomator and Pixelmator Pro articles say to test in a new administrator user account."}
+{"qid": "t107", "decision": "reject", "reason": "It is not phrased as a question, the 'connect' article is a how-to rather than troubleshooting, and 'tap Wi-Fi in Settings' is too incomplete to find a password."}
+{"qid": "t113", "decision": "keep", "reason": "Both the Touch ID and Personal Hotspot articles list making sure you have the latest iOS or iPadOS."}
+{"qid": "t120", "decision": "reject", "reason": "The macOS 10.12.6 requirement comes from the unrelated bookmarks article, not the update/restore article."}
+{"qid": "t129", "decision": "reject", "reason": "iOS 17 comes from the Apple TV recovery article, while bookmarks need iOS 11; the question mixes two unrelated issues, and the Apple TV fix needs an iPhone, not an iPad."}
+{"qid": "t155", "decision": "reject", "reason": "The iPad-car dependency has nothing to do with app tracking prompts; no evidence connects the two devices for this issue."}
+{"qid": "t162", "decision": "reject", "reason": "The cross-device dependency (iPhone DEPENDS_ON Apple Watch) is not supported by the evidence and has nothing to do with CarPlay; it is effectively a mislabeled single-hop question."}
+{"qid": "t173", "decision": "reject", "reason": "Nothing in the evidence ties charging to the Mac; the question says it is charging from a Mac but the answer is about a USB power adapter, and the AirPods-Mac link comes only from the connection article."}
+{"qid": "t178", "decision": "reject", "reason": "Using the iPad in a car has nothing to do with missing iCloud Backup data; no device dependency is shown."}
+{"qid": "t008", "decision": "keep", "reason": "Both cleaning the Smart Connector and updating iPadOS are stated in the keyboard article."}
+{"qid": "t015", "decision": "reject", "reason": "The gold answer only restates a pointer ('learn what to do if...') and gives no actionable fix."}
+{"qid": "t021", "decision": "keep", "reason": "The bookmarks article states both updating the device and checking that iCloud Bookmarks (Safari in iCloud) is turned on."}
+{"qid": "t026", "decision": "keep", "reason": "The FaceTime article lists dropped calls as a symptom of slow connections and recommends a fast connection."}
+{"qid": "t030", "decision": "keep", "reason": "Both methods (Settings > Accessibility > Zoom and Configure Accessibility on a computer) are stated in the article."}
+{"qid": "t039", "decision": "keep", "reason": "Checking TTL, confirming firewall timeouts and identifying the error are all sections of the Exchange timeout article."}
+{"qid": "t180", "decision": "keep", "reason": "The error 4005 article says to check for updates to your Mac or PC."}
+{"qid": "t186", "decision": "keep", "reason": "The general update/restore error article, which covers error codes including error 14, lists checking security software; error 14's dedicated article is not in the evidence."}
+{"qid": "t190", "decision": "keep", "reason": "The Error 1109 article lists bypassing the router by connecting directly to the modem."}
+{"qid": "t052", "decision": "reject", "reason": "The iPhone-slow article says to turn Low Power Mode OFF for better performance, so the gold contradicts the evidence."}
+{"qid": "t068", "decision": "reject", "reason": "Resetting NVRAM is only a conditional side step in both articles (question mark appears only briefly; Intel-only while disconnecting devices); the main question-mark fix is Disk Utility, so the answer is misleading."}
+{"qid": "t078", "decision": "keep", "reason": "Both the Apple Watch messages article and the USB-C charging article list checking for updates."}
+{"qid": "t084", "decision": "reject", "reason": "The hotspot article recommends updating macOS only for USB connections, not for connecting to Personal Hotspot over Wi-Fi."}
+{"qid": "t100", "decision": "reject", "reason": "'Open the Settings app' is a vague stitched answer, not a real shared fix stated for both symptoms."}
+{"qid": "t112", "decision": "reject", "reason": "Connecting with a USB cable is only one setup step in both articles, not a fix; the answer leaves out updating the computer, force restarting and choosing Update."}
+{"qid": "t122", "decision": "reject", "reason": "The key fact 'REQUIRES iPadOS 26' comes from the unrelated Pixelmator Pro article, and the question names its own answer."}
+{"qid": "t128", "decision": "reject", "reason": "The macOS 14.1 requirement comes from an unrelated camera article; the Safari article says to update software and use safe mode."}
+{"qid": "t134", "decision": "reject", "reason": "The macOS 14.1 requirement comes from an unrelated camera article, not the USB-C charging article."}
+{"qid": "t138", "decision": "reject", "reason": "The iOS 11 requirement comes from the bookmarks article; the SOS article just says to update to the latest iOS."}
+{"qid": "t142", "decision": "reject", "reason": "The macOS 14.1 requirement comes from a different article (legacy camera after the Sonoma 14.1 update), not tied to restarting for FaceTime."}
+{"qid": "t153", "decision": "reject", "reason": "The cross-device dependency (iPhone DEPENDS_ON Mac) is not supported, and the hotspot chunk is irrelevant; it is effectively a mislabeled single-hop question."}
+{"qid": "t163", "decision": "reject", "reason": "Using both devices with a car has nothing to do with the Messages Send & Receive issue; no device dependency is shown."}
+{"qid": "t170", "decision": "reject", "reason": "No evidence says the Mac depends on the iPad; the USB Devices Disabled article is about power-limited accessories, not an iPad file transfer."}
+{"qid": "t179", "decision": "reject", "reason": "The Finder article says to 'get help' for alert messages; deleting content is the fix for needing more space, not for alerts."}
+{"qid": "t005", "decision": "keep", "reason": "Charging for 20 minutes and holding the setup button for 15 seconds are stated in the replacement setup article; step order is slightly off and the connect step is missing, but that is minor."}
+{"qid": "t018", "decision": "keep", "reason": "The FaceTime article lists black screen as a slow-connection symptom and recommends a fast connection."}
+{"qid": "t033", "decision": "keep", "reason": "The article states the compatibility check and updating the iPhone to the latest iOS before updating the watch."}
+{"qid": "t146", "decision": "keep", "reason": "The Vision Pro article says to update both devices, and the macOS 14 requirement comes from the same article; the question is somewhat leading."}

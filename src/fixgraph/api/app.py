@@ -6,8 +6,8 @@ Two modes:
 - fake: `LLM__BACKEND=fake` or no corpus on disk. A two-chunk demo corpus, a lexical retriever
   and a fake LLM that cites its first source, so the container runs with no GPU, data or keys.
 
-Endpoints: /health, /retrieve, /answer, /graph/entity/{id}, /graph/subgraph, /links/suggestions
-(GNN gap candidates, always flagged `predicted`).
+Endpoints: /health (with LLM-cache hit rate), /retrieve, /answer, /graph/entity/{id},
+/graph/subgraph, /links/suggestions (GNN gap candidates, always flagged `predicted`).
 Used by: `fixgraph serve` (cli.py) via `create_app`.
 Uses: answer.grounded, retrieval (hybrid, index, rerank, bm25), kg.store, ingest.store,
 llm.factory, core.config.
@@ -30,6 +30,7 @@ from fixgraph.answer.grounded import AnswerOutput, AnswerSentence, answer_questi
 from fixgraph.core.config import Settings, load_settings
 from fixgraph.kg.store import KG, read_kg
 from fixgraph.llm.base import LLMClient, LLMRequest
+from fixgraph.llm.cache import CachedLLMClient
 from fixgraph.llm.fake import FakeLLMClient
 from fixgraph.retrieval.base import NoRetrieval, RetrievalResult, Retriever
 from fixgraph.retrieval.bm25 import tokenize
@@ -247,6 +248,7 @@ def create_app(state: ServiceState | None = None) -> FastAPI:
             "llm_reachable": llm_ok,
             "chunks": len(st.chunk_text),
             "systems": st.systems(),
+            "llm_cache": st.llm.stats() if isinstance(st.llm, CachedLLMClient) else None,
         }
 
     @app.post("/retrieve")

@@ -16,6 +16,8 @@ QType = Literal[
     "error_code",
     "multi_constraint",
     "unanswerable",
+    "bridge",  # D35: answer in a linked article; the link concept is not named
+    "bridge_direct",  # D35: the same answer asked for directly (matched single-hop control)
 ]
 
 
@@ -69,8 +71,9 @@ QuestionFilter = Literal["all", "screened", "verified"]
 
 
 def select_questions(questions: list[Question], which: QuestionFilter) -> list[Question]:
-    """all = everything; screened = auto-screen passed or human-verified; verified = human only.
-    Human-rejected questions are already removed from the file by `bench verify`."""
+    """all = everything; screened = auto-screen passed or verified; verified = reviewed
+    (`verified_by` names the reviewer). `bench verify` removes rejected questions from the file;
+    a review applied from a decisions file may leave them in, unverified, so use `verified`."""
     if which == "verified":
         return [q for q in questions if q.verified]
     if which == "screened":

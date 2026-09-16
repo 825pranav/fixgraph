@@ -27,7 +27,7 @@ from tqdm import tqdm
 from fixgraph.answer.grounded import GroundedAnswer, answer_question
 from fixgraph.answer.verifier import VerifiedAnswer, verify_answer
 from fixgraph.bench import metrics as M
-from fixgraph.bench.judge import JudgeOutput, judge_answer
+from fixgraph.bench.judge import JudgeExample, JudgeOutput, JudgeVariant, judge_answer
 from fixgraph.bench.schema import Question
 from fixgraph.bench.stats import bootstrap_ci, holm, paired_effect_size, paired_permutation_test
 from fixgraph.llm.base import LLMClient
@@ -132,7 +132,11 @@ def stage_judge(
     client: LLMClient,
     model: str,
     out: Path,
+    variant: JudgeVariant = "v1",
+    examples: Sequence[JudgeExample] = (),
 ) -> list[JudgeRow]:
+    """Claim verifier + correctness judge. Writes `judge_meta.json` next to `out` so the report
+    states which judge prompt produced the scores."""
     qmap = {q.qid: q for q in questions}
     rows: list[JudgeRow] = []
     for a in tqdm(answers, desc="judge"):
@@ -142,9 +146,11 @@ def stage_judge(
             if a.system == "S0"
             else verify_answer(client, a.answer, chunk_text, model)
         )
-        jd = judge_answer(client, q, a.answer.text, a.answer.abstained, model)
+        jd = judge_answer(client, q, a.answer.text, a.answer.abstained, model, variant, examples)
         rows.append(JudgeRow(qid=a.qid, system=a.system, verified=ver, judge=jd))
     _write(out, rows)
+    meta = {"model": model, "variant": variant, "n_examples": len(examples)}
+    (out.parent / "judge_meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     return rows
 
 
@@ -270,10 +276,12 @@ def _mean_by_type(
     return dict(out)
 
 
-def _provenance(questions: list[Question]) -> dict[str, int]:
-    """How much of the question set a human has verified vs only auto-screened."""
+def _provenance(questions: list[Question]) -> dict[str, Any]:
+    """How much of the question set was verified (and by whom) vs only auto-screened."""
+    by = Counter(q.verified_by or "unknown" for q in questions if q.verified)
     return {
-        "human_verified": sum(q.verified for q in questions),
+        "verified": sum(q.verified for q in questions),
+        "verified_by": dict(sorted(by.items())),
         "auto_screen_passed": sum(bool(q.screen and q.screen.passed) for q in questions),
         "total": len(questions),
     }
@@ -388,9 +396,14 @@ def render_markdown(report: dict[str, Any]) -> str:
     if prov:
         lines.insert(
             1,
-            f"Human-verified: {prov['human_verified']}/{prov['total']}; "
+            f"Verified: {prov['verified']}/{prov['total']}"
+            + (f" (by {', '.join(prov['verified_by'])})" if prov.get("verified_by") else "")
+            + "; "
             f"auto-screen passed: {prov['auto_screen_passed']}/{prov['total']}",
         )
+    judge = report.get("judge")
+    if judge:
+        lines.insert(1, f"Judge: {judge['model']}, prompt {judge['variant']}")
     spans = report.get("by_evidence_span", {})
     if any(spans.values()):
         lines += ["", "By evidence span (correctness / recall@8, n):", ""]

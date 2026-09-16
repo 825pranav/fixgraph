@@ -1,0 +1,11 @@
+{
+  "file": "data/bench/bridge.jsonl",
+  "sha256": "9b7866a6580eea2dca11a0a85a65fbf03258eb100af802e8f47ac2e5d32439bb",
+  "questions": 216,
+  "verified_pairs": 78,
+  "verified_by": [
+    "claude-opus-5-5"
+  ],
+  "sha256_lf": "6af80fe700b0db31ff508ad871d2e8a54821e495bf5613c83a643d8b02377641",
+  "note": "sha256 was taken on the Windows working copy (CRLF line endings); git stores LF, so a clone matches sha256_lf. Content is otherwise byte-identical."
+}

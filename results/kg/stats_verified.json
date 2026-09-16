@@ -1,0 +1,103 @@
+{
+  "nodes": 2201,
+  "edges_extracted": 2341,
+  "nodes_by_label": {
+    "Fix": 978,
+    "Cause": 416,
+    "Symptom": 256,
+    "Article": 220,
+    "Component": 168,
+    "OSVersion": 54,
+    "Feature": 47,
+    "Product": 45,
+    "ErrorCode": 10,
+    "ProductFamily": 7
+  },
+  "edges_by_rel": {
+    "RESOLVED_BY": 811,
+    "EXHIBITS": 368,
+    "CAUSED_BY": 296,
+    "ADDRESSES": 295,
+    "INVOLVES": 217,
+    "HAS_COMPONENT": 178,
+    "REQUIRES": 55,
+    "APPLIES_TO": 53,
+    "RUNS": 33,
+    "IN_FAMILY": 24,
+    "SIGNALS": 6,
+    "DEPENDS_ON": 5
+  },
+  "degree_by_label": {
+    "Fix": {
+      "mean": 1.19,
+      "median": 1.0,
+      "max": 11,
+      "isolated_pct": 20.0
+    },
+    "Cause": {
+      "mean": 1.42,
+      "median": 1.0,
+      "max": 9,
+      "isolated_pct": 22.6
+    },
+    "Symptom": {
+      "mean": 6.84,
+      "median": 5.0,
+      "max": 32,
+      "isolated_pct": 0.8
+    },
+    "Article": {
+      "mean": 0.0,
+      "median": 0.0,
+      "max": 0,
+      "isolated_pct": 100.0
+    },
+    "Component": {
+      "mean": 2.2,
+      "median": 1.0,
+      "max": 32,
+      "isolated_pct": 12.5
+    },
+    "OSVersion": {
+      "mean": 2.11,
+      "median": 1.0,
+      "max": 8,
+      "isolated_pct": 13.0
+    },
+    "Feature": {
+      "mean": 0.94,
+      "median": 1.0,
+      "max": 3,
+      "isolated_pct": 17.0
+    },
+    "Product": {
+      "mean": 13.8,
+      "median": 2.0,
+      "max": 159,
+      "isolated_pct": 8.9
+    },
+    "ErrorCode": {
+      "mean": 0.6,
+      "median": 1.0,
+      "max": 1,
+      "isolated_pct": 40.0
+    },
+    "ProductFamily": {
+      "mean": 3.43,
+      "median": 2.0,
+      "max": 7,
+      "isolated_pct": 0.0
+    }
+  },
+  "symptoms_with_fix_pct": 83.6,
+  "components_excluding_articles": 375,
+  "largest_component_nodes": 1541,
+  "edges_with_provenance_pct": 100.0,
+  "verification": {
+    "model": "qwen3:8b",
+    "claims": 3415,
+    "claims_supported": 2728,
+    "claims_llm_yes_quote_missing": 58,
+    "claims_failed_calls": 17
+  }
+}

@@ -1,0 +1,234 @@
+{
+  "n_pairs": 78,
+  "k": 8,
+  "answer_chunk_hit@8": {
+    "bridge": {
+      "mean": {
+        "S1": {
+          "mean": 0.833,
+          "lo": 0.756,
+          "hi": 0.923,
+          "n": 78
+        },
+        "S2": {
+          "mean": 0.423,
+          "lo": 0.321,
+          "hi": 0.526,
+          "n": 78
+        },
+        "S2L": {
+          "mean": 0.41,
+          "lo": 0.308,
+          "hi": 0.513,
+          "n": 78
+        },
+        "S3": {
+          "mean": 0.269,
+          "lo": 0.179,
+          "hi": 0.359,
+          "n": 78
+        },
+        "S4": {
+          "mean": 0.782,
+          "lo": 0.692,
+          "hi": 0.872,
+          "n": 78
+        }
+      },
+      "tests_vs_S1": [
+        {
+          "system": "S2",
+          "n": 78,
+          "diff": -0.41,
+          "p": 0.0001,
+          "d_z": -0.75,
+          "p_holm": 0.0004
+        },
+        {
+          "system": "S2L",
+          "n": 78,
+          "diff": -0.423,
+          "p": 0.0001,
+          "d_z": -0.81,
+          "p_holm": 0.0004
+        },
+        {
+          "system": "S3",
+          "n": 78,
+          "diff": -0.564,
+          "p": 0.0001,
+          "d_z": -1.08,
+          "p_holm": 0.0004
+        },
+        {
+          "system": "S4",
+          "n": 78,
+          "diff": -0.051,
+          "p": 0.1311,
+          "d_z": -0.23,
+          "p_holm": 0.1311
+        }
+      ]
+    },
+    "direct": {
+      "mean": {
+        "S1": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0,
+          "n": 78
+        },
+        "S2": {
+          "mean": 0.564,
+          "lo": 0.462,
+          "hi": 0.667,
+          "n": 78
+        },
+        "S2L": {
+          "mean": 0.615,
+          "lo": 0.513,
+          "hi": 0.718,
+          "n": 78
+        },
+        "S3": {
+          "mean": 0.449,
+          "lo": 0.346,
+          "hi": 0.564,
+          "n": 78
+        },
+        "S4": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0,
+          "n": 78
+        }
+      },
+      "tests_vs_S1": [
+        {
+          "system": "S2",
+          "n": 78,
+          "diff": -0.436,
+          "p": 0.0001,
+          "d_z": -0.87,
+          "p_holm": 0.0004
+        },
+        {
+          "system": "S2L",
+          "n": 78,
+          "diff": -0.385,
+          "p": 0.0001,
+          "d_z": -0.79,
+          "p_holm": 0.0004
+        },
+        {
+          "system": "S3",
+          "n": 78,
+          "diff": -0.551,
+          "p": 0.0001,
+          "d_z": -1.1,
+          "p_holm": 0.0004
+        },
+        {
+          "system": "S4",
+          "n": 78,
+          "diff": 0.0,
+          "p": 1.0,
+          "d_z": 0.0,
+          "p_holm": 1.0
+        }
+      ]
+    },
+    "hop_cost": {
+      "mean": {
+        "S1": {
+          "mean": 0.167,
+          "lo": 0.077,
+          "hi": 0.244,
+          "n": 78
+        },
+        "S2": {
+          "mean": 0.141,
+          "lo": 0.051,
+          "hi": 0.244,
+          "n": 78
+        },
+        "S2L": {
+          "mean": 0.205,
+          "lo": 0.103,
+          "hi": 0.308,
+          "n": 78
+        },
+        "S3": {
+          "mean": 0.179,
+          "lo": 0.077,
+          "hi": 0.282,
+          "n": 78
+        },
+        "S4": {
+          "mean": 0.218,
+          "lo": 0.128,
+          "hi": 0.308,
+          "n": 78
+        }
+      },
+      "crossover_tests_vs_S1": [
+        {
+          "system": "S2",
+          "n": 78,
+          "diff": -0.026,
+          "p": 0.8372,
+          "d_z": -0.05,
+          "p_holm": 1.0
+        },
+        {
+          "system": "S2L",
+          "n": 78,
+          "diff": 0.038,
+          "p": 0.7,
+          "d_z": 0.07,
+          "p_holm": 1.0
+        },
+        {
+          "system": "S3",
+          "n": 78,
+          "diff": 0.013,
+          "p": 1.0,
+          "d_z": 0.02,
+          "p_holm": 1.0
+        },
+        {
+          "system": "S4",
+          "n": 78,
+          "diff": 0.051,
+          "p": 0.1311,
+          "d_z": 0.23,
+          "p_holm": 0.5243
+        }
+      ]
+    }
+  },
+  "correctness": {
+    "bridge": {
+      "mean": {},
+      "tests_vs_S1": []
+    },
+    "direct": {
+      "mean": {},
+      "tests_vs_S1": []
+    },
+    "hop_cost": {
+      "mean": {},
+      "crossover_tests_vs_S1": []
+    }
+  },
+  "note": "hop cost = direct - bridge per pair (positive = the hop hurts); tests are paired permutation tests vs S1, Holm-corrected across systems (DECISIONS.md D35).",
+  "frozen": {
+    "file": "data/bench/bridge.jsonl",
+    "sha256": "9b7866a6580eea2dca11a0a85a65fbf03258eb100af802e8f47ac2e5d32439bb",
+    "questions": 216,
+    "verified_pairs": 78,
+    "verified_by": [
+      "claude-opus-5-5"
+    ]
+  }
+}
