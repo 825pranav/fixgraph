@@ -1,0 +1,1019 @@
+{
+  "kg_dir": "data/kg_verified",
+  "main93": {
+    "k": 8,
+    "n_questions": 93,
+    "n_gold_chunks": 171,
+    "n_missed_chunks": 18,
+    "questions_with_a_miss": 16,
+    "by_type": {
+      "single_hop": {
+        "questions": 31,
+        "missed_chunks": 1
+      },
+      "multi_constraint": {
+        "questions": 43,
+        "missed_chunks": 15
+      },
+      "version_conditional": {
+        "questions": 8,
+        "missed_chunks": 2
+      },
+      "error_code": {
+        "questions": 11,
+        "missed_chunks": 0
+      }
+    },
+    "expand_from_top3": {
+      "routes": {
+        "same_article": {
+          "reached": 4,
+          "share": 0.222,
+          "median_pool_chunks": 2.5
+        },
+        "link1": {
+          "reached": 5,
+          "share": 0.278,
+          "median_pool_chunks": 11.5
+        },
+        "link2": {
+          "reached": 13,
+          "share": 0.722,
+          "median_pool_chunks": 82.0
+        },
+        "kg0": {
+          "reached": 16,
+          "share": 0.889,
+          "median_pool_chunks": 214.0
+        },
+        "kg1": {
+          "reached": 18,
+          "share": 1.0,
+          "median_pool_chunks": 441.0
+        },
+        "kg2": {
+          "reached": 18,
+          "share": 1.0,
+          "median_pool_chunks": 483.0
+        },
+        "same_article_or_link1": {
+          "reached": 5,
+          "share": 0.278
+        }
+      },
+      "misses": [
+        {
+          "qid": "t042",
+          "qtype": "multi_constraint",
+          "missing": "122710:0:0",
+          "same_article": false,
+          "link1": false,
+          "link2": false,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t048",
+          "qtype": "multi_constraint",
+          "missing": "108396:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t063",
+          "qtype": "multi_constraint",
+          "missing": "102623:5:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t088",
+          "qtype": "multi_constraint",
+          "missing": "102578:5:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t093",
+          "qtype": "multi_constraint",
+          "missing": "117827:0:0",
+          "same_article": false,
+          "link1": false,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t101",
+          "qtype": "multi_constraint",
+          "missing": "122709:14:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t105",
+          "qtype": "multi_constraint",
+          "missing": "122710:0:0",
+          "same_article": false,
+          "link1": false,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t110",
+          "qtype": "multi_constraint",
+          "missing": "119876:0:0",
+          "same_article": false,
+          "link1": false,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t121",
+          "qtype": "version_conditional",
+          "missing": "117827:2:0",
+          "same_article": false,
+          "link1": false,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t127",
+          "qtype": "version_conditional",
+          "missing": "102642:4:0",
+          "same_article": false,
+          "link1": false,
+          "link2": false,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t069",
+          "qtype": "multi_constraint",
+          "missing": "109057:0:0",
+          "same_article": false,
+          "link1": false,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t083",
+          "qtype": "multi_constraint",
+          "missing": "108643:0:0",
+          "same_article": false,
+          "link1": false,
+          "link2": false,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t098",
+          "qtype": "multi_constraint",
+          "missing": "122709:5:0",
+          "same_article": false,
+          "link1": false,
+          "link2": true,
+          "kg0": false,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t098",
+          "qtype": "multi_constraint",
+          "missing": "122710:5:0",
+          "same_article": false,
+          "link1": false,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t098",
+          "qtype": "multi_constraint",
+          "missing": "122780:5:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t103",
+          "qtype": "multi_constraint",
+          "missing": "122709:11:0",
+          "same_article": false,
+          "link1": false,
+          "link2": true,
+          "kg0": false,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t118",
+          "qtype": "multi_constraint",
+          "missing": "119876:0:0",
+          "same_article": false,
+          "link1": false,
+          "link2": false,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t036",
+          "qtype": "single_hop",
+          "missing": "102327:0:0",
+          "same_article": false,
+          "link1": false,
+          "link2": false,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        }
+      ]
+    },
+    "expand_from_top8": {
+      "routes": {
+        "same_article": {
+          "reached": 8,
+          "share": 0.444,
+          "median_pool_chunks": 7.5
+        },
+        "link1": {
+          "reached": 10,
+          "share": 0.556,
+          "median_pool_chunks": 19.0
+        },
+        "link2": {
+          "reached": 15,
+          "share": 0.833,
+          "median_pool_chunks": 153.0
+        },
+        "kg0": {
+          "reached": 18,
+          "share": 1.0,
+          "median_pool_chunks": 336.5
+        },
+        "kg1": {
+          "reached": 18,
+          "share": 1.0,
+          "median_pool_chunks": 475.0
+        },
+        "kg2": {
+          "reached": 18,
+          "share": 1.0,
+          "median_pool_chunks": 480.0
+        },
+        "same_article_or_link1": {
+          "reached": 10,
+          "share": 0.556
+        }
+      },
+      "misses": [
+        {
+          "qid": "t042",
+          "qtype": "multi_constraint",
+          "missing": "122710:0:0",
+          "same_article": false,
+          "link1": false,
+          "link2": false,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t048",
+          "qtype": "multi_constraint",
+          "missing": "108396:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t063",
+          "qtype": "multi_constraint",
+          "missing": "102623:5:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t088",
+          "qtype": "multi_constraint",
+          "missing": "102578:5:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t093",
+          "qtype": "multi_constraint",
+          "missing": "117827:0:0",
+          "same_article": false,
+          "link1": false,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t101",
+          "qtype": "multi_constraint",
+          "missing": "122709:14:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t105",
+          "qtype": "multi_constraint",
+          "missing": "122710:0:0",
+          "same_article": false,
+          "link1": false,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t110",
+          "qtype": "multi_constraint",
+          "missing": "119876:0:0",
+          "same_article": false,
+          "link1": false,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t121",
+          "qtype": "version_conditional",
+          "missing": "117827:2:0",
+          "same_article": false,
+          "link1": false,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t127",
+          "qtype": "version_conditional",
+          "missing": "102642:4:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t069",
+          "qtype": "multi_constraint",
+          "missing": "109057:0:0",
+          "same_article": false,
+          "link1": false,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t083",
+          "qtype": "multi_constraint",
+          "missing": "108643:0:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t098",
+          "qtype": "multi_constraint",
+          "missing": "122709:5:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t098",
+          "qtype": "multi_constraint",
+          "missing": "122710:5:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t098",
+          "qtype": "multi_constraint",
+          "missing": "122780:5:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t103",
+          "qtype": "multi_constraint",
+          "missing": "122709:11:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t118",
+          "qtype": "multi_constraint",
+          "missing": "119876:0:0",
+          "same_article": false,
+          "link1": false,
+          "link2": false,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "t036",
+          "qtype": "single_hop",
+          "missing": "102327:0:0",
+          "same_article": false,
+          "link1": false,
+          "link2": false,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        }
+      ]
+    }
+  },
+  "bridge156": {
+    "k": 8,
+    "n_questions": 156,
+    "n_gold_chunks": 234,
+    "n_missed_chunks": 19,
+    "questions_with_a_miss": 19,
+    "by_type": {
+      "bridge": {
+        "questions": 78,
+        "missed_chunks": 19
+      },
+      "bridge_direct": {
+        "questions": 78,
+        "missed_chunks": 0
+      }
+    },
+    "expand_from_top3": {
+      "routes": {
+        "same_article": {
+          "reached": 3,
+          "share": 0.158,
+          "median_pool_chunks": 2
+        },
+        "link1": {
+          "reached": 18,
+          "share": 0.947,
+          "median_pool_chunks": 20
+        },
+        "link2": {
+          "reached": 19,
+          "share": 1.0,
+          "median_pool_chunks": 112
+        },
+        "kg0": {
+          "reached": 17,
+          "share": 0.895,
+          "median_pool_chunks": 284
+        },
+        "kg1": {
+          "reached": 18,
+          "share": 0.947,
+          "median_pool_chunks": 475
+        },
+        "kg2": {
+          "reached": 18,
+          "share": 0.947,
+          "median_pool_chunks": 484
+        },
+        "same_article_or_link1": {
+          "reached": 18,
+          "share": 0.947
+        }
+      },
+      "misses": [
+        {
+          "qid": "b014a",
+          "qtype": "bridge",
+          "missing": "118575:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": false,
+          "kg1": false,
+          "kg2": false
+        },
+        {
+          "qid": "b017a",
+          "qtype": "bridge",
+          "missing": "111107:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b018a",
+          "qtype": "bridge",
+          "missing": "108382:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b020a",
+          "qtype": "bridge",
+          "missing": "102551:2:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b021a",
+          "qtype": "bridge",
+          "missing": "102551:2:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b024a",
+          "qtype": "bridge",
+          "missing": "118575:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b025a",
+          "qtype": "bridge",
+          "missing": "102642:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b040a",
+          "qtype": "bridge",
+          "missing": "102675:0:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b051a",
+          "qtype": "bridge",
+          "missing": "118575:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b052a",
+          "qtype": "bridge",
+          "missing": "108346:2:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b064a",
+          "qtype": "bridge",
+          "missing": "102282:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b066a",
+          "qtype": "bridge",
+          "missing": "108805:3:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b074a",
+          "qtype": "bridge",
+          "missing": "102642:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b085a",
+          "qtype": "bridge",
+          "missing": "102282:0:0",
+          "same_article": false,
+          "link1": false,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b089a",
+          "qtype": "bridge",
+          "missing": "118105:3:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b093a",
+          "qtype": "bridge",
+          "missing": "118575:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b095a",
+          "qtype": "bridge",
+          "missing": "102558:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b107a",
+          "qtype": "bridge",
+          "missing": "118575:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b108a",
+          "qtype": "bridge",
+          "missing": "108382:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": false,
+          "kg1": true,
+          "kg2": true
+        }
+      ]
+    },
+    "expand_from_top8": {
+      "routes": {
+        "same_article": {
+          "reached": 7,
+          "share": 0.368,
+          "median_pool_chunks": 7
+        },
+        "link1": {
+          "reached": 19,
+          "share": 1.0,
+          "median_pool_chunks": 34
+        },
+        "link2": {
+          "reached": 19,
+          "share": 1.0,
+          "median_pool_chunks": 194
+        },
+        "kg0": {
+          "reached": 19,
+          "share": 1.0,
+          "median_pool_chunks": 393
+        },
+        "kg1": {
+          "reached": 19,
+          "share": 1.0,
+          "median_pool_chunks": 475
+        },
+        "kg2": {
+          "reached": 19,
+          "share": 1.0,
+          "median_pool_chunks": 482
+        },
+        "same_article_or_link1": {
+          "reached": 19,
+          "share": 1.0
+        }
+      },
+      "misses": [
+        {
+          "qid": "b014a",
+          "qtype": "bridge",
+          "missing": "118575:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b017a",
+          "qtype": "bridge",
+          "missing": "111107:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b018a",
+          "qtype": "bridge",
+          "missing": "108382:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b020a",
+          "qtype": "bridge",
+          "missing": "102551:2:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b021a",
+          "qtype": "bridge",
+          "missing": "102551:2:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b024a",
+          "qtype": "bridge",
+          "missing": "118575:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b025a",
+          "qtype": "bridge",
+          "missing": "102642:0:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b040a",
+          "qtype": "bridge",
+          "missing": "102675:0:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b051a",
+          "qtype": "bridge",
+          "missing": "118575:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b052a",
+          "qtype": "bridge",
+          "missing": "108346:2:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b064a",
+          "qtype": "bridge",
+          "missing": "102282:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b066a",
+          "qtype": "bridge",
+          "missing": "108805:3:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b074a",
+          "qtype": "bridge",
+          "missing": "102642:0:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b085a",
+          "qtype": "bridge",
+          "missing": "102282:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b089a",
+          "qtype": "bridge",
+          "missing": "118105:3:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b093a",
+          "qtype": "bridge",
+          "missing": "118575:0:0",
+          "same_article": true,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b095a",
+          "qtype": "bridge",
+          "missing": "102558:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b107a",
+          "qtype": "bridge",
+          "missing": "118575:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        },
+        {
+          "qid": "b108a",
+          "qtype": "bridge",
+          "missing": "108382:0:0",
+          "same_article": false,
+          "link1": true,
+          "link2": true,
+          "kg0": true,
+          "kg1": true,
+          "kg2": true
+        }
+      ]
+    }
+  }
+}

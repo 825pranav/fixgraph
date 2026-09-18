@@ -1,0 +1,629 @@
+{
+  "route_threshold": 0.987616240978241,
+  "n_dev": 151,
+  "configs": [
+    {
+      "config": "S1",
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 0,
+      "broken": 0,
+      "recovered_broken_by_type": {}
+    },
+    {
+      "config": "prior-d1-l1",
+      "main": {
+        "n": 57,
+        "recall@8": 0.5906,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.7021,
+        "answer_hit@8": 0.6596
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 0.3617,
+        "answer_hit@8": 0.3617
+      },
+      "recovered": 8,
+      "broken": 91,
+      "recovered_broken_by_type": {
+        "multi_constraint": {
+          "recovered": 0,
+          "broken": 22
+        },
+        "single_hop": {
+          "recovered": 0,
+          "broken": 11
+        },
+        "error_code": {
+          "recovered": 0,
+          "broken": 3
+        },
+        "bridge": {
+          "recovered": 8,
+          "broken": 25
+        },
+        "bridge_direct": {
+          "recovered": 0,
+          "broken": 30
+        }
+      }
+    },
+    {
+      "config": "prior-d1-l1+route",
+      "main": {
+        "n": 57,
+        "recall@8": 0.7544,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.734,
+        "answer_hit@8": 0.7021
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 0.8723,
+        "answer_hit@8": 0.8723
+      },
+      "recovered": 8,
+      "broken": 46,
+      "recovered_broken_by_type": {
+        "multi_constraint": {
+          "recovered": 0,
+          "broken": 12
+        },
+        "single_hop": {
+          "recovered": 0,
+          "broken": 3
+        },
+        "error_code": {
+          "recovered": 0,
+          "broken": 3
+        },
+        "bridge": {
+          "recovered": 8,
+          "broken": 22
+        },
+        "bridge_direct": {
+          "recovered": 0,
+          "broken": 6
+        }
+      }
+    },
+    {
+      "config": "prior-d1-l2",
+      "main": {
+        "n": 57,
+        "recall@8": 0.5906,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.7021,
+        "answer_hit@8": 0.6596
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 0.3617,
+        "answer_hit@8": 0.3617
+      },
+      "recovered": 8,
+      "broken": 91,
+      "recovered_broken_by_type": {
+        "multi_constraint": {
+          "recovered": 0,
+          "broken": 22
+        },
+        "single_hop": {
+          "recovered": 0,
+          "broken": 11
+        },
+        "error_code": {
+          "recovered": 0,
+          "broken": 3
+        },
+        "bridge": {
+          "recovered": 8,
+          "broken": 25
+        },
+        "bridge_direct": {
+          "recovered": 0,
+          "broken": 30
+        }
+      }
+    },
+    {
+      "config": "prior-d1-l2+route",
+      "main": {
+        "n": 57,
+        "recall@8": 0.7544,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.734,
+        "answer_hit@8": 0.7021
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 0.8723,
+        "answer_hit@8": 0.8723
+      },
+      "recovered": 8,
+      "broken": 46,
+      "recovered_broken_by_type": {
+        "multi_constraint": {
+          "recovered": 0,
+          "broken": 12
+        },
+        "single_hop": {
+          "recovered": 0,
+          "broken": 3
+        },
+        "error_code": {
+          "recovered": 0,
+          "broken": 3
+        },
+        "bridge": {
+          "recovered": 8,
+          "broken": 22
+        },
+        "bridge_direct": {
+          "recovered": 0,
+          "broken": 6
+        }
+      }
+    },
+    {
+      "config": "prior-d1-l4",
+      "main": {
+        "n": 57,
+        "recall@8": 0.5906,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.7021,
+        "answer_hit@8": 0.6596
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 0.3617,
+        "answer_hit@8": 0.3617
+      },
+      "recovered": 8,
+      "broken": 91,
+      "recovered_broken_by_type": {
+        "multi_constraint": {
+          "recovered": 0,
+          "broken": 22
+        },
+        "single_hop": {
+          "recovered": 0,
+          "broken": 11
+        },
+        "error_code": {
+          "recovered": 0,
+          "broken": 3
+        },
+        "bridge": {
+          "recovered": 8,
+          "broken": 25
+        },
+        "bridge_direct": {
+          "recovered": 0,
+          "broken": 30
+        }
+      }
+    },
+    {
+      "config": "prior-d1-l4+route",
+      "main": {
+        "n": 57,
+        "recall@8": 0.7544,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.734,
+        "answer_hit@8": 0.7021
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 0.8723,
+        "answer_hit@8": 0.8723
+      },
+      "recovered": 8,
+      "broken": 46,
+      "recovered_broken_by_type": {
+        "multi_constraint": {
+          "recovered": 0,
+          "broken": 12
+        },
+        "single_hop": {
+          "recovered": 0,
+          "broken": 3
+        },
+        "error_code": {
+          "recovered": 0,
+          "broken": 3
+        },
+        "bridge": {
+          "recovered": 8,
+          "broken": 22
+        },
+        "bridge_direct": {
+          "recovered": 0,
+          "broken": 6
+        }
+      }
+    },
+    {
+      "config": "prior-d3-l1",
+      "main": {
+        "n": 57,
+        "recall@8": 0.5468,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9043,
+        "answer_hit@8": 0.9149
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 0.8298,
+        "answer_hit@8": 0.8298
+      },
+      "recovered": 7,
+      "broken": 52,
+      "recovered_broken_by_type": {
+        "multi_constraint": {
+          "recovered": 0,
+          "broken": 23
+        },
+        "single_hop": {
+          "recovered": 0,
+          "broken": 13
+        },
+        "error_code": {
+          "recovered": 0,
+          "broken": 3
+        },
+        "bridge": {
+          "recovered": 7,
+          "broken": 5
+        },
+        "bridge_direct": {
+          "recovered": 0,
+          "broken": 8
+        }
+      }
+    },
+    {
+      "config": "prior-d3-l1+route",
+      "main": {
+        "n": 57,
+        "recall@8": 0.693,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9043,
+        "answer_hit@8": 0.9149
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 7,
+      "broken": 28,
+      "recovered_broken_by_type": {
+        "multi_constraint": {
+          "recovered": 0,
+          "broken": 15
+        },
+        "single_hop": {
+          "recovered": 0,
+          "broken": 5
+        },
+        "error_code": {
+          "recovered": 0,
+          "broken": 3
+        },
+        "bridge": {
+          "recovered": 7,
+          "broken": 5
+        }
+      }
+    },
+    {
+      "config": "prior-d3-l2",
+      "main": {
+        "n": 57,
+        "recall@8": 0.5468,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9043,
+        "answer_hit@8": 0.9149
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 0.8298,
+        "answer_hit@8": 0.8298
+      },
+      "recovered": 7,
+      "broken": 52,
+      "recovered_broken_by_type": {
+        "multi_constraint": {
+          "recovered": 0,
+          "broken": 23
+        },
+        "single_hop": {
+          "recovered": 0,
+          "broken": 13
+        },
+        "error_code": {
+          "recovered": 0,
+          "broken": 3
+        },
+        "bridge": {
+          "recovered": 7,
+          "broken": 5
+        },
+        "bridge_direct": {
+          "recovered": 0,
+          "broken": 8
+        }
+      }
+    },
+    {
+      "config": "prior-d3-l2+route",
+      "main": {
+        "n": 57,
+        "recall@8": 0.693,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9043,
+        "answer_hit@8": 0.9149
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 7,
+      "broken": 28,
+      "recovered_broken_by_type": {
+        "multi_constraint": {
+          "recovered": 0,
+          "broken": 15
+        },
+        "single_hop": {
+          "recovered": 0,
+          "broken": 5
+        },
+        "error_code": {
+          "recovered": 0,
+          "broken": 3
+        },
+        "bridge": {
+          "recovered": 7,
+          "broken": 5
+        }
+      }
+    },
+    {
+      "config": "prior-d3-l4",
+      "main": {
+        "n": 57,
+        "recall@8": 0.5468,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9043,
+        "answer_hit@8": 0.9149
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 0.8298,
+        "answer_hit@8": 0.8298
+      },
+      "recovered": 7,
+      "broken": 52,
+      "recovered_broken_by_type": {
+        "multi_constraint": {
+          "recovered": 0,
+          "broken": 23
+        },
+        "single_hop": {
+          "recovered": 0,
+          "broken": 13
+        },
+        "error_code": {
+          "recovered": 0,
+          "broken": 3
+        },
+        "bridge": {
+          "recovered": 7,
+          "broken": 5
+        },
+        "bridge_direct": {
+          "recovered": 0,
+          "broken": 8
+        }
+      }
+    },
+    {
+      "config": "prior-d3-l4+route",
+      "main": {
+        "n": 57,
+        "recall@8": 0.693,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9043,
+        "answer_hit@8": 0.9149
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 7,
+      "broken": 28,
+      "recovered_broken_by_type": {
+        "multi_constraint": {
+          "recovered": 0,
+          "broken": 15
+        },
+        "single_hop": {
+          "recovered": 0,
+          "broken": 5
+        },
+        "error_code": {
+          "recovered": 0,
+          "broken": 3
+        },
+        "bridge": {
+          "recovered": 7,
+          "broken": 5
+        }
+      }
+    },
+    {
+      "config": "protected-d1",
+      "main": {
+        "n": 57,
+        "recall@8": 0.8889,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9149,
+        "answer_hit@8": 0.8936
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 4,
+      "broken": 6,
+      "recovered_broken_by_type": {
+        "multi_constraint": {
+          "recovered": 0,
+          "broken": 4
+        },
+        "single_hop": {
+          "recovered": 0,
+          "broken": 1
+        },
+        "bridge": {
+          "recovered": 4,
+          "broken": 1
+        }
+      }
+    },
+    {
+      "config": "protected-d3",
+      "main": {
+        "n": 57,
+        "recall@8": 0.8977,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9043,
+        "answer_hit@8": 0.8936
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 2,
+      "broken": 4,
+      "recovered_broken_by_type": {
+        "multi_constraint": {
+          "recovered": 0,
+          "broken": 3
+        },
+        "single_hop": {
+          "recovered": 0,
+          "broken": 1
+        },
+        "bridge": {
+          "recovered": 2,
+          "broken": 0
+        }
+      }
+    },
+    {
+      "config": "union-d1",
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 0,
+      "broken": 0,
+      "recovered_broken_by_type": {}
+    },
+    {
+      "config": "union-d3",
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 0,
+      "broken": 0,
+      "recovered_broken_by_type": {}
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "route_threshold": 0.987616240978241,
+  "finalists": [
+    {
+      "kind": "prior",
+      "d": 3,
+      "lam": 0.1,
+      "routing": true
+    },
+    {
+      "kind": "prior",
+      "d": 1,
+      "lam": 0.1,
+      "routing": true
+    }
+  ],
+  "selection": "D37 rule: highest dev main recall@8 (tie at S1's 0.9298), then dev bridge answer_hit@8 (0.8936), then recovered - broken (+5/-0, +4/-0)"
+}
