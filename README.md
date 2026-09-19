@@ -204,6 +204,41 @@ enough for dense + BM25 search to reach the target article. No system's hop cost
 significantly from S1's (crossover tests, all p_Holm ≥ 0.52). Answer correctness on this set
 has not been run yet (retrieval-only round).
 
+### Third round: can a graph + hybrid combination beat hybrid alone? (2026-09-25)
+
+Protocol D37–D38; the test split was hash-frozen and the finalists committed (`6b5acd3`)
+before the test split was cached or scored. One test run, no tuning afterwards.
+
+**Ceiling first** (`results/combo/miss_analysis.json`). S1 misses 18/171 gold chunks (main) and
+19/234 (bridge). 25 of those 37 misses are already in S1's top-30 candidates and are demoted by
+the cross-encoder. Verified-KG routes open 200–480 chunks per question (no usable signal);
+Apple's article links open about 20 and reach 28% (main) / 95% (bridge) of misses. The edge
+source for every combination is therefore **Apple's human-authored link graph, not the
+LLM-extracted KG**.
+
+**Dev search** (`results/combo/dev_log.json`, 16 configurations plus a mis-scaled first grid kept
+in `dev_log_grid1_logit_scale.json`): no configuration beat S1 on the main dev set; union +
+rerank reproduced S1 exactly. Finalists: a routed link prior (cross-encoder probability + 0.1
+for chunks of articles Apple-linked to S1's top 3 or top 1, applied only when S1's top score is
+below the dev median).
+
+**Locked test** (`results/combo/test_report.json`; 36 main + 62 bridge questions):
+
+| | n | S1 | link prior (top 3) | link prior (top 1) | p_Holm |
+|---|---|---|---|---|---|
+| main recall@8 | 36 | 0.891 [0.83, 0.95] | 0.891 | 0.891 | 1.0 |
+| bridge answer-chunk hit@8 * | 31 | 0.806 | 0.871 | 0.871 | 0.99 |
+| direct answer-chunk hit@8 * | 31 | 1.000 | 1.000 | 1.000 | 1.0 |
+| recovered / broken gold chunks | | | +3 / −2 (all bridge) | +2 / −1 (all bridge) | |
+| added latency per query | | 0.46 s (S1) | +0.08 s | +0.05 s | |
+
+\* Non-independent: bridge pairs were built from the same Apple links (D35, D37).
+
+**Result: a tie.** On the independent main split the combination returns the same chunks as
+S1 (no gains, no losses). On bridge questions it answers 2 more of 31, which is not
+significant and not independent of the link source. Hybrid retrieval with a cross-encoder
+remains the best retriever measured in this project.
+
 ### Knowledge graph
 
 qwen3:4b, prompt v2, 500 chunks, 4.9 s/chunk wall-clock (2 concurrent requests, ~9 s each),
@@ -294,6 +329,9 @@ data/gold, data/bench   committed annotations and questions (no raw article text
   understated; system rankings agree under both.
 - **Auto-screen is a weak filter.** On the test set it kept ~46 questions the review rejected
   and failed 27 it kept.
+- **Graph + hybrid combinations tie hybrid on held-out data** (D38): no gain on the independent
+  main split; the bridge gain (+2/31) is not significant and depends on the same links the
+  bridge questions were built from.
 - **Edge verification is lenient.** It removes 43% of unsupported edges while keeping 87% of true
   ones; 23% of the remaining edges are still unsupported (D32). A stricter verifier needs a fresh
   labelled sample to be measured honestly.
@@ -349,6 +387,9 @@ citations to chunks outside the context are stripped, and a qwen3:8b verifier dr
 unsupported claims.
 
 ## Reproduce
+
+Third round (D37–D38): `fixgraph bench miss-analysis`, `combo-split`, `combo-cache --split
+dev`, `combo-dev`, then (after recording finalists) `combo-cache --split test` and `combo-test`.
 
 Second round (D32–D36): `fixgraph kg edge-sample`, `fixgraph kg verify-edges`, `fixgraph kg
 edge-eval`; `fixgraph ingest links`; `fixgraph bench bridge-import` / `bridge-freeze`;

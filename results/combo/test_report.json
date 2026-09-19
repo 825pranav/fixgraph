@@ -1,0 +1,447 @@
+{
+  "n_questions": 98,
+  "route_threshold": 0.987616240978241,
+  "table": {
+    "main": {
+      "S1": {
+        "n": 36,
+        "recall@8": {
+          "mean": 0.8912,
+          "lo": 0.8264,
+          "hi": 0.9514
+        }
+      },
+      "prior-d3-l0.1+route": {
+        "n": 36,
+        "recall@8": {
+          "mean": 0.8912,
+          "lo": 0.8264,
+          "hi": 0.9514
+        }
+      },
+      "prior-d1-l0.1+route": {
+        "n": 36,
+        "recall@8": {
+          "mean": 0.8912,
+          "lo": 0.8264,
+          "hi": 0.9514
+        }
+      }
+    },
+    "error_code": {
+      "S1": {
+        "n": 4,
+        "recall@8": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0
+        }
+      },
+      "prior-d3-l0.1+route": {
+        "n": 4,
+        "recall@8": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0
+        }
+      },
+      "prior-d1-l0.1+route": {
+        "n": 4,
+        "recall@8": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0
+        }
+      }
+    },
+    "multi_constraint": {
+      "S1": {
+        "n": 17,
+        "recall@8": {
+          "mean": 0.799,
+          "lo": 0.6912,
+          "hi": 0.9021
+        }
+      },
+      "prior-d3-l0.1+route": {
+        "n": 17,
+        "recall@8": {
+          "mean": 0.799,
+          "lo": 0.6912,
+          "hi": 0.9021
+        }
+      },
+      "prior-d1-l0.1+route": {
+        "n": 17,
+        "recall@8": {
+          "mean": 0.799,
+          "lo": 0.6912,
+          "hi": 0.9021
+        }
+      }
+    },
+    "single_hop": {
+      "S1": {
+        "n": 12,
+        "recall@8": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0
+        }
+      },
+      "prior-d3-l0.1+route": {
+        "n": 12,
+        "recall@8": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0
+        }
+      },
+      "prior-d1-l0.1+route": {
+        "n": 12,
+        "recall@8": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0
+        }
+      }
+    },
+    "version_conditional": {
+      "S1": {
+        "n": 3,
+        "recall@8": {
+          "mean": 0.8333,
+          "lo": 0.5,
+          "hi": 1.0
+        }
+      },
+      "prior-d3-l0.1+route": {
+        "n": 3,
+        "recall@8": {
+          "mean": 0.8333,
+          "lo": 0.5,
+          "hi": 1.0
+        }
+      },
+      "prior-d1-l0.1+route": {
+        "n": 3,
+        "recall@8": {
+          "mean": 0.8333,
+          "lo": 0.5,
+          "hi": 1.0
+        }
+      }
+    },
+    "bridge": {
+      "S1": {
+        "n": 31,
+        "recall@8": {
+          "mean": 0.871,
+          "lo": 0.7903,
+          "hi": 0.9359
+        },
+        "answer_hit@8": {
+          "mean": 0.8065,
+          "lo": 0.6774,
+          "hi": 0.9355
+        }
+      },
+      "prior-d3-l0.1+route": {
+        "n": 31,
+        "recall@8": {
+          "mean": 0.8871,
+          "lo": 0.8065,
+          "hi": 0.9516
+        },
+        "answer_hit@8": {
+          "mean": 0.871,
+          "lo": 0.7419,
+          "hi": 0.9677
+        }
+      },
+      "prior-d1-l0.1+route": {
+        "n": 31,
+        "recall@8": {
+          "mean": 0.8871,
+          "lo": 0.8065,
+          "hi": 0.9677
+        },
+        "answer_hit@8": {
+          "mean": 0.871,
+          "lo": 0.7419,
+          "hi": 0.9677
+        }
+      }
+    },
+    "bridge_direct": {
+      "S1": {
+        "n": 31,
+        "recall@8": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0
+        },
+        "answer_hit@8": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0
+        }
+      },
+      "prior-d3-l0.1+route": {
+        "n": 31,
+        "recall@8": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0
+        },
+        "answer_hit@8": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0
+        }
+      },
+      "prior-d1-l0.1+route": {
+        "n": 31,
+        "recall@8": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0
+        },
+        "answer_hit@8": {
+          "mean": 1.0,
+          "lo": 1.0,
+          "hi": 1.0
+        }
+      }
+    }
+  },
+  "tests_vs_S1": {
+    "main": [
+      {
+        "subset": "main",
+        "metric": "recall@8",
+        "system": "prior-d3-l0.1+route",
+        "n": 36,
+        "diff": 0.0,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      {
+        "subset": "main",
+        "metric": "recall@8",
+        "system": "prior-d1-l0.1+route",
+        "n": 36,
+        "diff": 0.0,
+        "p": 1.0,
+        "p_holm": 1.0
+      }
+    ],
+    "error_code": [
+      {
+        "subset": "error_code",
+        "metric": "recall@8",
+        "system": "prior-d3-l0.1+route",
+        "n": 4,
+        "diff": 0.0,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      {
+        "subset": "error_code",
+        "metric": "recall@8",
+        "system": "prior-d1-l0.1+route",
+        "n": 4,
+        "diff": 0.0,
+        "p": 1.0,
+        "p_holm": 1.0
+      }
+    ],
+    "multi_constraint": [
+      {
+        "subset": "multi_constraint",
+        "metric": "recall@8",
+        "system": "prior-d3-l0.1+route",
+        "n": 17,
+        "diff": 0.0,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      {
+        "subset": "multi_constraint",
+        "metric": "recall@8",
+        "system": "prior-d1-l0.1+route",
+        "n": 17,
+        "diff": 0.0,
+        "p": 1.0,
+        "p_holm": 1.0
+      }
+    ],
+    "single_hop": [
+      {
+        "subset": "single_hop",
+        "metric": "recall@8",
+        "system": "prior-d3-l0.1+route",
+        "n": 12,
+        "diff": 0.0,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      {
+        "subset": "single_hop",
+        "metric": "recall@8",
+        "system": "prior-d1-l0.1+route",
+        "n": 12,
+        "diff": 0.0,
+        "p": 1.0,
+        "p_holm": 1.0
+      }
+    ],
+    "version_conditional": [
+      {
+        "subset": "version_conditional",
+        "metric": "recall@8",
+        "system": "prior-d3-l0.1+route",
+        "n": 3,
+        "diff": 0.0,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      {
+        "subset": "version_conditional",
+        "metric": "recall@8",
+        "system": "prior-d1-l0.1+route",
+        "n": 3,
+        "diff": 0.0,
+        "p": 1.0,
+        "p_holm": 1.0
+      }
+    ],
+    "bridge": [
+      {
+        "subset": "bridge",
+        "metric": "recall@8",
+        "system": "prior-d3-l0.1+route",
+        "n": 31,
+        "diff": 0.0161,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      {
+        "subset": "bridge",
+        "metric": "recall@8",
+        "system": "prior-d1-l0.1+route",
+        "n": 31,
+        "diff": 0.0161,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      {
+        "subset": "bridge",
+        "metric": "answer_hit@8",
+        "system": "prior-d3-l0.1+route",
+        "n": 31,
+        "diff": 0.0645,
+        "p": 0.6191,
+        "p_holm": 0.987
+      },
+      {
+        "subset": "bridge",
+        "metric": "answer_hit@8",
+        "system": "prior-d1-l0.1+route",
+        "n": 31,
+        "diff": 0.0645,
+        "p": 0.4935,
+        "p_holm": 0.987
+      }
+    ],
+    "bridge_direct": [
+      {
+        "subset": "bridge_direct",
+        "metric": "recall@8",
+        "system": "prior-d3-l0.1+route",
+        "n": 31,
+        "diff": 0.0,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      {
+        "subset": "bridge_direct",
+        "metric": "recall@8",
+        "system": "prior-d1-l0.1+route",
+        "n": 31,
+        "diff": 0.0,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      {
+        "subset": "bridge_direct",
+        "metric": "answer_hit@8",
+        "system": "prior-d3-l0.1+route",
+        "n": 31,
+        "diff": 0.0,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      {
+        "subset": "bridge_direct",
+        "metric": "answer_hit@8",
+        "system": "prior-d1-l0.1+route",
+        "n": 31,
+        "diff": 0.0,
+        "p": 1.0,
+        "p_holm": 1.0
+      }
+    ]
+  },
+  "recovered_broken": {
+    "prior-d3-l0.1+route": {
+      "bridge": {
+        "recovered": 3,
+        "broken": 2
+      }
+    },
+    "prior-d1-l0.1+route": {
+      "bridge": {
+        "recovered": 2,
+        "broken": 1
+      }
+    }
+  },
+  "latency_s": {
+    "S1": {
+      "mean": 0.4623,
+      "p95": 0.5043
+    },
+    "prior-d3-l0.1+route": {
+      "extra_over_S1": {
+        "mean": 0.0783,
+        "p95": 0.3515
+      }
+    },
+    "prior-d1-l0.1+route": {
+      "extra_over_S1": {
+        "mean": 0.0483,
+        "p95": 0.2046
+      }
+    }
+  },
+  "note": "edge source: Apple's human-authored article links, not the LLM-extracted KG; bridge rows are non-independent (pairs were built from those links, D37).",
+  "finalists": {
+    "route_threshold": 0.987616240978241,
+    "finalists": [
+      {
+        "kind": "prior",
+        "d": 3,
+        "lam": 0.1,
+        "routing": true
+      },
+      {
+        "kind": "prior",
+        "d": 1,
+        "lam": 0.1,
+        "routing": true
+      }
+    ],
+    "selection": "D37 rule: highest dev main recall@8 (tie at S1's 0.9298), then dev bridge answer_hit@8 (0.8936), then recovered - broken (+5/-0, +4/-0)"
+  }
+}
