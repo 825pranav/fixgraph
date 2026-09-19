@@ -1,24 +1,92 @@
 # FixGraph
 
-**Does structured graph retrieval improve correctness and faithfulness on multi-hop
-troubleshooting questions compared with strong hybrid RAG, and at what cost?**
+**Does structured graph retrieval improve multi-hop troubleshooting QA over strong hybrid RAG,
+and at what cost?**
 
 FixGraph turns public Apple support articles into a typed, provenance-tracked troubleshooting
 knowledge graph (product → symptom → cause → fix), reproduces HippoRAG-style Personalized
-PageRank retrieval, trains a heterogeneous GNN for symptom→fix link prediction, and benchmarks
-graph retrieval against hybrid RAG. Everything runs **locally on a laptop GPU (RTX 4050, 6 GB)
-with free open-weight models** (qwen3:4b / qwen3:8b via Ollama, Qwen3-Embedding-0.6B,
-bge-reranker-v2-m3). Inference cost: $0.
+PageRank retrieval, and benchmarks graph retrieval, and graph + hybrid combinations, against
+hybrid RAG. Everything runs **locally on a laptop GPU (RTX 4050, 6 GB) with free open-weight
+models** (qwen3:4b / qwen3:8b via Ollama, Qwen3-Embedding-0.6B, bge-reranker-v2-m3).
+Inference cost: $0.
 
 ![CI](https://github.com/825pranav/fixgraph/actions/workflows/ci.yml/badge.svg)
 
-## Results (dev run, 2026-09-23)
+## Answer: no, at this scale
 
-> **Read this first.** These are results on a small, time-boxed **dev** benchmark: 30
-> hand-written questions over a 220-article / 500-chunk corpus. The questions and the
-> extraction gold set were drafted by an AI assistant from the corpus text and are **not yet
-> human-verified**; judge–human agreement (κ) is **not yet measured**. Treat the numbers as a
-> working baseline, not the final answer to the research question. See [Limitations](#limitations).
+On every benchmark in this project, a hybrid retriever (dense + BM25 + cross-encoder rerank)
+**matched or beat every graph-based retriever**, including on multi-hop questions built from
+Apple's own article links, and on a held-out split that was hash-frozen before the final run.
+The best graph + hybrid combination **tied** hybrid on held-out data. This agrees with published
+comparisons, in which graph retrieval rarely beats strong hybrid retrieval on fact lookup. It is
+a careful replication in a new domain on local hardware, not a new result.
+
+What the project does add:
+- an **audit of LLM-extracted graph quality**: 31% of edges extracted by a small local model are
+  not stated by their source text (blind dual-rater sample), worst for causal and cross-device
+  relations;
+- a **miss analysis** of the hybrid retriever: 25 of its 37 residual misses are already among its
+  top-30 candidates and are demoted by the cross-encoder, so the remaining headroom is a
+  reranking problem, not a recall problem;
+- **pre-registered evaluation**: every protocol is in [`docs/DECISIONS.md`](docs/DECISIONS.md)
+  before its run; test sets are frozen by hash; losing configurations stay in the logs.
+
+## Results at a glance
+
+Every number links to a committed file. Mean [95% bootstrap CI] where shown; p-values are
+paired permutation tests, Holm-corrected.
+
+**Retrieval**
+
+| Metric | Result | n | Source |
+|---|---|---|---|
+| Hybrid recall@8, **held-out split** (frozen before the run) | **0.891** [0.83, 0.95] | 36 | [`results/combo/test_report.json`](results/combo/test_report.json) |
+| Hybrid recall@8, reviewed test questions | **0.915** | 93 | [`results/test/report_verified.json`](results/test/report_verified.json) |
+| Hybrid answer-chunk hit@8, direct / unnamed multi-hop (bridge) | **1.00 / 0.83** | 78 pairs | [`results/bridge/bridge_report.json`](results/bridge/bridge_report.json) |
+| Graph retrievers on bridge questions (PPR / PPR + article links / typed paths) | 0.42 / 0.41 / 0.27 (all p < 0.001 vs hybrid) | 78 | same |
+| Best graph + hybrid combination vs hybrid, held-out main split | 0.891 vs 0.891 (**tie**; 0 recovered, 0 broken) | 36 | [`results/combo/test_report.json`](results/combo/test_report.json) |
+| Same, held-out bridge answer-chunk hit@8 * | 0.871 vs 0.806 (p_Holm = 0.99, not significant) | 31 | same |
+| Retrieval latency per query (hybrid / + graph reranking) | 0.46 s / +0.05 s | 98 | same |
+
+\* Not independent: bridge questions were built from the same Apple links the combination uses.
+
+**Answers** (qwen3:4b answers, qwen3:8b judge; see the caveat below)
+
+| Metric | Hybrid RAG | Closed-book | Source |
+|---|---|---|---|
+| Correctness (0 / 0.5 / 1) | 0.65 [0.58, 0.71] | 0.31 [0.26, 0.37] | [`results/test/report_verified.json`](results/test/report_verified.json) |
+| Key-fact recall | 0.78 | 0.29 | same |
+| Unsupported-claim rate (claim verifier) | 0.10 | — | same |
+| End-to-end latency p50 / p95 | 6.1 s / 7.9 s | 3.6 s / 4.5 s | same |
+
+Caveat: the judge agrees with the reference labels at only **κ = 0.38** (target 0.6) and is one
+step harsh on fully correct answers, so read correctness as a ranking between systems, not an
+absolute score ([`results/test/judge_kappa.json`](results/test/judge_kappa.json)).
+
+**Knowledge graph**
+
+| Metric | Result | Source |
+|---|---|---|
+| Size | 2,201 nodes, 2,926 edges, 100% with source provenance | [`results/kg/stats.json`](results/kg/stats.json) |
+| Unsupported edges (audited sample, population-weighted) | **31.4%** [25.4, 37.5] before, **23.3%** [16.9, 29.9] after verification | [`results/kg/edge_verification.json`](results/kg/edge_verification.json) |
+| Verifier: true edges kept / unsupported edges removed | 87% / 43% | same |
+| Audit rater agreement | κ = 0.82 (209 edges, two blind raters) | same |
+| GNN link prediction (Symptom → Fix) | a common-neighbour heuristic beats the learned models (MRR 0.32 vs 0.04) | [`results/gnn/results.json`](results/gnn/results.json) |
+
+**Who made the evaluation data.** Test questions were generated by qwen3:8b (from graph paths)
+and by Claude Opus 5.5 (bridge questions, from Apple's links). All reviews and reference labels
+are by Claude Opus 5.5, as blind, independent raters, disclosed as `verified_by` /
+`labeler: claude-opus-5-5` in every file. **Nothing here is human-verified.** Claude never grades
+system answers or verifies edges, so no Claude output is scored against other Claude output.
+
+The sections below give the full detail of each round, in the order it was run.
+
+## Earlier results: dev run (2026-09-23)
+
+> **Historical.** The first run: 30 hand-written, single-article questions over a
+> 220-article / 500-chunk corpus, drafted by an AI assistant and not human-verified. Hybrid RAG
+> was already at the retrieval ceiling here (recall@8 = 1.00), which motivated the multi-article
+> and bridge benchmarks below. The summary above supersedes these numbers.
 >
 > Every number below comes from committed artifacts in [`results/`](results/):
 > `results/dev/report.{md,json}` (benchmark, per-question metrics), `results/kg/stats.json` and
@@ -285,16 +353,14 @@ documented in a different article.
 | M1 corpus: 1,915 scraped, 1,000 selected, deterministic chunking | done (500-chunk working set) |
 | M2 knowledge graph, validation, resolution, quality report | done; gold set pending human review |
 | M3 hybrid RAG, grounded answers, verifier, stats harness | done |
-| M4 GraphRAG (PPR, typed paths), entity linking | done |
-| M5 benchmark: generation, auto-screen, verification | done: 93 reviewed path questions + 78 frozen bridge pairs (D35); judge κ = 0.38, recalibration coded (D33), not yet run |
+| M4 GraphRAG (PPR, typed paths, article-link layer, fusion), entity linking, edge verification | done |
+| M5 benchmark: generation, review, bridge set, locked split | done: 93 reviewed + 78 frozen bridge pairs; held-out combination test (D37–D38); judge κ = 0.38, recalibration coded (D33), not run |
 | M6 GNN: baselines, hetero-SAGE, gap report | done (S4 routing not run) |
 | M7 FastAPI, Docker (CI-built), write-up | done |
 
-Next steps (no GPU needed, see [Human review](#human-review)): a human pass over the 93
-model-reviewed questions and ~80 human judge labels (the current reference labels are from a
-model), then review the 50 gold extraction chunks. If human κ stays below 0.6, recalibrate the
-judge prompt (it is one step harsh on fully correct answers) and re-judge; cached answers are
-reused, so only the judge stage re-runs.
+Next steps: run the judge calibration (D33; about 1–2 h GPU) and re-judge; a human pass over a
+sample of questions and judge labels; study why the cross-encoder demotes 25 of the hybrid
+retriever's 37 residual misses (the only headroom left); scale to the full 2,531-chunk corpus.
 
 ## Repository layout
 
@@ -380,6 +446,9 @@ flowchart LR
 | S1 | Hybrid RAG: dense (Qwen3-Embedding) + BM25 in Qdrant, RRF, cross-encoder rerank |
 | S2 | GraphRAG PPR (HippoRAG reproduction): entity linking → Personalized PageRank → chunk scores → rerank |
 | S3 | GraphRAG typed paths: schema-valid ≤3-hop paths from linked entities → provenance chunks → rerank |
+| S2L | S2 plus an article layer: each article joined to the entities it mentions and to the articles Apple links it to (D34) |
+| S4 | Reciprocal-rank fusion of S1's candidates and S2L's PPR ranking, then the same rerank (D34) |
+| link prior | S1's top-30 pool plus chunks of articles Apple-linked to S1's top hits; cross-encoder score + 0.1 for linked chunks, only when S1 is not confident (D37–D38) |
 
 All systems share the embedding model, reranker, answer model (qwen3:4b), answer prompt and
 6k-token context budget; only retrieval differs. Answers must cite a chunk id per sentence,
