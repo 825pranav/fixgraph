@@ -13,6 +13,25 @@ from fixgraph.retrieval.bm25 import tokenize
 logger = logging.getLogger(__name__)
 
 DEFAULT_RERANKER = "BAAI/bge-reranker-v2-m3"
+QWEN_RERANKER = "Qwen/Qwen3-Reranker-0.6B"
+TROUBLESHOOT_PROMPT = (
+    "Given a question about a problem with an Apple device, retrieve support article passages "
+    "that answer it"
+)
+
+# Named reranker settings compared in the reranking study (DECISIONS.md D39):
+# name -> (model, max_length in tokens, instruction prompt or None for the model default).
+# Qwen3-Reranker runs with batch size 4: a batch of 16 padded to 1024 tokens overflows 6 GB of
+# VRAM into the driver's system-memory fallback (13-17 s queries in results/rerank).
+RERANKERS: dict[str, tuple[str, int, str | None]] = {
+    "bge": (DEFAULT_RERANKER, 512, None),
+    "bge1024": (DEFAULT_RERANKER, 1024, None),
+    "qwen": (QWEN_RERANKER, 1024, None),
+    "qwents": (QWEN_RERANKER, 1024, TROUBLESHOOT_PROMPT),
+    # D40: fine-tuned on out-of-corpus synthetic queries (`fixgraph bench ft-train`); local only
+    "bgeft": ("data/models/bge-ft", 512, None),
+    "qwentsft": ("data/models/qwents-ft", 1024, TROUBLESHOOT_PROMPT),
+}
 
 
 class Reranker(Protocol):
@@ -23,7 +42,12 @@ class Reranker(Protocol):
 
 class CrossEncoderReranker:
     def __init__(
-        self, model_name: str = DEFAULT_RERANKER, device: str | None = None, max_length: int = 512
+        self,
+        model_name: str = DEFAULT_RERANKER,
+        device: str | None = None,
+        max_length: int = 512,
+        prompt: str | None = None,
+        batch_size: int = 16,
     ) -> None:
         import torch
         from sentence_transformers import CrossEncoder
@@ -33,12 +57,21 @@ class CrossEncoderReranker:
         self._model = CrossEncoder(
             model_name, device=device, max_length=max_length, model_kwargs=kwargs
         )
+        self._batch_size = batch_size
+        self._prompt = prompt  # instruction for instruction-tuned rerankers (Qwen3-Reranker)
         logger.info("loaded reranker %s on %s", model_name, device)
+
+    @classmethod
+    def named(cls, name: str, device: str | None = None) -> "CrossEncoderReranker":
+        model, max_length, prompt = RERANKERS[name]
+        batch = 4 if model == QWEN_RERANKER or "qwen" in name else 16
+        return cls(model, device=device, max_length=max_length, prompt=prompt, batch_size=batch)
 
     def score(self, query: str, docs: list[str]) -> list[float]:
         if not docs:
             return []
-        scores = self._model.predict([(query, d) for d in docs], batch_size=16)
+        pairs = [(query, d) for d in docs]
+        scores = self._model.predict(pairs, batch_size=self._batch_size, prompt=self._prompt)
         return [float(s) for s in scores]
 
     def release(self) -> None:

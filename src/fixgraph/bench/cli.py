@@ -7,13 +7,16 @@ from pathlib import Path
 from typing import cast, get_args
 
 import typer
+from pydantic import BaseModel
 from tqdm import tqdm
 
 from fixgraph.bench import run as R
 from fixgraph.bench.combo import CacheRow
 from fixgraph.bench.judge import JudgeExample, JudgeVariant
+from fixgraph.bench.rerank_study import StudyRow
 from fixgraph.bench.schema import Question, QuestionFilter, read_questions, select_questions
 from fixgraph.core.config import Settings, load_settings
+from fixgraph.core.models import Chunk
 from fixgraph.ingest.store import read_articles, read_chunks
 from fixgraph.retrieval.index import chunk_document
 
@@ -908,3 +911,434 @@ def combo_test(out: str = typer.Option("results/combo/test_report.json")) -> Non
     Path(out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     typer.echo(json.dumps({k: report[k] for k in ("table", "tests_vs_S1", "recovered_broken",
                                                    "latency_s")}, indent=1))  # fmt: skip
+
+
+# --- reranking study (D39) ----------------------------------------------------------------------
+
+_RR = Path("results/rerank")
+
+
+def _rr_cache_path(split: str) -> Path:
+    return load_settings().paths.results / "rerank" / f"cache_{split}.jsonl"
+
+
+def _rr_rows(split: str) -> dict[str, StudyRow]:
+    lines = _rr_cache_path(split).read_text(encoding="utf-8").splitlines()
+    return {r.qid: r for r in (StudyRow.model_validate_json(x) for x in lines)}
+
+
+@app.command("rr-cache")
+def rr_cache(
+    split: str = typer.Option(..., help="dev | test"),
+    scorers: str = typer.Option("bge,bge1024,qwen,qwents", help="names from rerank.RERANKERS"),
+) -> None:
+    """GPU pass for the reranking study: top-100 fused candidates per question, then each
+    reranker's scores over them (one model on the GPU at a time). Adds missing scorers to an
+    existing cache."""
+    from fixgraph.bench.rerank_study import POOL_MAX, StudyRow, score_slices
+    from fixgraph.embeddings import SentenceTransformerEmbedder
+    from fixgraph.retrieval.hybrid import HybridRetriever
+    from fixgraph.retrieval.index import load_bm25, open_client
+    from fixgraph.retrieval.rerank import CrossEncoderReranker
+
+    if split == "test" and not (_RR / "selected.json").exists():
+        raise typer.BadParameter("select the configuration on dev (D39) before the test split")
+    settings = load_settings()
+    paths = settings.paths
+    docs, _ = _chunk_docs(settings)
+    qs = _combo_questions(split)
+    out = _rr_cache_path(split)
+    rows = _rr_rows(split) if out.exists() else {}
+    if len(rows) < len(qs):
+        import time
+
+        embedder = SentenceTransformerEmbedder()
+        client = open_client(paths.index)
+        try:
+            hybrid = HybridRetriever(client, embedder, load_bm25(paths.index), None, docs)
+            hybrid.candidates_for(qs[0].question, POOL_MAX)  # warm-up, not timed
+            for q in tqdm(qs, desc="search"):
+                t0 = time.perf_counter()
+                cands = hybrid.candidates_for(q.question, POOL_MAX)
+                rows[q.qid] = StudyRow(qid=q.qid, fused=[c for c, _ in cands],
+                                       rrf=[s for _, s in cands], search_s=time.perf_counter() - t0,
+                                       scores={}, score_s={})  # fmt: skip
+        finally:
+            client.close()
+            embedder.release()
+    for name in scorers.split(","):
+        todo = [q for q in qs if name not in rows[q.qid].scores]
+        if not todo:
+            continue
+        reranker = CrossEncoderReranker.named(name)
+        try:
+            reranker.score(todo[0].question, [docs[rows[todo[0].qid].fused[0]]])  # warm-up
+            for q in tqdm(todo, desc=name):
+                row = rows[q.qid]
+                row.scores[name], row.score_s[name] = score_slices(
+                    q.question, row.fused, docs, reranker.score
+                )
+        finally:
+            reranker.release()
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text("".join(rows[q.qid].model_dump_json() + "\n" for q in qs), encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("".join(rows[q.qid].model_dump_json() + "\n" for q in qs), encoding="utf-8")
+    typer.echo(f"{len(qs)} questions cached -> {out}")
+
+
+@app.command("rr-dev")
+def rr_dev(scorers: str = typer.Option("bge,bge1024,qwen,qwents")) -> None:
+    """Score the D39 grid on the dev split, log every configuration, record the selection."""
+    from fixgraph.bench.rerank_study import StudyConfig, evaluate, grid, select
+
+    qs = _combo_questions("dev")
+    rows = _rr_rows("dev")
+    baseline = StudyConfig(scorer="bge", pool=30)
+    log = evaluate(qs, rows, grid(scorers.split(",")), baseline)
+    chosen = select(log, baseline.name)
+    _RR.mkdir(parents=True, exist_ok=True)
+    (_RR / "dev_log.json").write_text(
+        json.dumps({"n_dev": len(qs), "baseline": baseline.name, "selected": chosen["config"],
+                    "configs": log}, indent=2) + "\n", encoding="utf-8")  # fmt: skip
+    for e in log:
+        typer.echo(
+            f"{e['config']:<28} all {e['all']['recall@8']}  main {e['main']['recall@8']}"
+            f"  bridge {e['bridge']['answer_hit@8']}"
+            f"  direct {e['bridge_direct']['answer_hit@8']}"
+            f"  +{e['recovered']}/-{e['broken']}  {e['latency_s']['mean']}s"
+        )
+    typer.echo(f"selected: {chosen['config']}")
+
+
+# --- reranker fine-tuning on out-of-corpus synthetic queries (D40) -------------------------------
+
+
+def _outside_corpus(settings: Settings) -> tuple[list[Chunk], dict[str, str]]:
+    """Chunks of scraped articles outside the 500-chunk working set, and their documents."""
+    paths = settings.paths
+    inside = {c.article_id for c in read_chunks(paths.chunks)}
+    titles = {a.article_id: a.title for a in read_articles(paths.corpus / "articles_full.parquet")}
+    chunks = [
+        c for c in read_chunks(paths.corpus / "chunks_full.parquet") if c.article_id not in inside
+    ]
+    return chunks, {c.chunk_id: chunk_document(c, titles.get(c.article_id, "")) for c in chunks}
+
+
+@app.command("ft-synth")
+def ft_synth(
+    n: int = typer.Option(600, help="chunks to write one query for"),
+    negatives: int = typer.Option(7),
+) -> None:
+    """Synthetic (query, positive, hard negatives) groups from out-of-corpus chunks (D40)."""
+    from fixgraph.embeddings import SentenceTransformerEmbedder
+    from fixgraph.llm.factory import build_llm_client
+    from fixgraph.retrieval.finetune import SynthPair, mine_negatives, sample_chunks, synth_question
+
+    settings = load_settings()
+    chunks, docs = _outside_corpus(settings)
+    titles = {a.article_id: a.title for a in read_articles(settings.paths.corpus /
+                                                             "articles_full.parquet")}  # fmt: skip
+    picked = sample_chunks(chunks, set(), n, seed=settings.seed)
+    model = settings.llm.answer_model
+    client = build_llm_client(settings)
+    pairs: list[SynthPair] = []
+    try:
+        for c in tqdm(picked, desc="synth"):
+            q = synth_question(client, model, titles.get(c.article_id, ""), c.text)
+            if q:
+                pairs.append(SynthPair(chunk_id=c.chunk_id, article_id=c.article_id, question=q))
+    finally:
+        client.close()
+        _unload(settings, model)
+    embedder = SentenceTransformerEmbedder()
+    try:
+        ids = list(docs)
+        arts = [i.split(":", 1)[0] for i in ids]
+        demb = embedder.encode([docs[i] for i in ids])
+        qemb = embedder.encode([p.question for p in pairs], query=True)
+    finally:
+        embedder.release()
+    for p, qe in zip(pairs, qemb, strict=True):
+        p.negatives = mine_negatives(qe, demb, ids, arts, p.article_id, negatives)
+    out = settings.paths.results / "rerank" / "synth.jsonl"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("".join(p.model_dump_json() + "\n" for p in pairs), encoding="utf-8")
+    typer.echo(f"{len(pairs)}/{len(picked)} synthetic groups -> {out}")
+
+
+@app.command("ft-train")
+def ft_train(
+    base: str = typer.Option("qwents", help="name from rerank.RERANKERS"),
+    out_name: str = typer.Option("qwents-ft"),
+    train_layers: int = typer.Option(4),
+    epochs: int = typer.Option(1),
+    lr: float = typer.Option(2e-5),
+) -> None:
+    """Fine-tune a reranker's top layers on the synthetic groups; saves to data/models/."""
+    import torch
+    from sentence_transformers import CrossEncoder
+
+    from fixgraph.retrieval.finetune import SynthPair, train_listwise
+    from fixgraph.retrieval.rerank import RERANKERS
+
+    settings = load_settings()
+    _, docs = _outside_corpus(settings)
+    lines = (settings.paths.results / "rerank" / "synth.jsonl").read_text(encoding="utf-8")
+    pairs = [SynthPair.model_validate_json(x) for x in lines.splitlines() if x.strip()]
+    model_name, max_length, prompt = RERANKERS[base]
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    kwargs = {"torch_dtype": torch.float32}
+    model = CrossEncoder(model_name, device=device, max_length=max_length, model_kwargs=kwargs)
+    hist = train_listwise(model, pairs, docs, prompt=prompt, train_layers=train_layers,
+                          epochs=epochs, lr=lr, seed=settings.seed)  # fmt: skip
+    target = settings.paths.root / "models" / out_name
+    model.save(str(target))
+    meta = {"base": base, "n_groups": len(pairs), "train_layers": train_layers, "epochs": epochs,
+            "lr": lr, "loss_per_epoch": [round(h, 4) for h in hist]}  # fmt: skip
+    (target / "fixgraph_train.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
+    typer.echo(json.dumps(meta))
+
+
+@app.command("rr-select")
+def rr_select() -> None:
+    """Record the finalists (D41) from results/rerank/dev_log.json before the test split."""
+    from fixgraph.bench.rerank_study import select_finalists
+
+    target = _RR / "selected.json"
+    if target.exists():
+        raise typer.BadParameter(f"{target} exists; finalists are recorded once (D41)")
+    dev = json.loads((_RR / "dev_log.json").read_text(encoding="utf-8"))
+    fin = select_finalists(dev["configs"], dev["baseline"])
+    base = next(e for e in dev["configs"] if e["config"] == dev["baseline"])
+    keep = ("config", "spec", "all", "main", "bridge", "bridge_direct", "latency_s")
+    target.write_text(json.dumps({"baseline": {k: base[k] for k in keep},
+                                  "finalists": [{k: f[k] for k in keep} for f in fin]},
+                                 indent=2) + "\n", encoding="utf-8")  # fmt: skip
+    typer.echo(", ".join(f["config"] for f in fin) or "no finalist beats the baseline")
+
+
+@app.command("rr-test")
+def rr_test(out: str = typer.Option("results/rerank/test_report.json")) -> None:
+    """The single locked-test run (D39/D41): S1 and each finalist through the live retriever on
+    the test split, with per-query timing. Refuses to rerun."""
+    import hashlib
+    import time
+
+    from fixgraph.bench.rerank_study import StudyConfig, test_summary
+    from fixgraph.embeddings import SentenceTransformerEmbedder
+    from fixgraph.retrieval.hybrid import HybridRetriever
+    from fixgraph.retrieval.index import load_bm25, open_client
+    from fixgraph.retrieval.rerank import CrossEncoderReranker
+
+    if Path(out).exists():
+        raise typer.BadParameter(f"{out} exists; the test split is evaluated once")
+    sel = json.loads((_RR / "selected.json").read_text(encoding="utf-8"))
+    split = json.loads((_COMBO / "split.json").read_text(encoding="utf-8"))
+    qs = _combo_questions("test")
+    if (
+        hashlib.sha256("\n".join(sorted(q.qid for q in qs)).encode()).hexdigest()
+        != split["test_sha256"]
+    ):
+        raise typer.BadParameter("test questions do not match the frozen split hash")
+    cfgs = [StudyConfig(**sel["baseline"]["spec"])] + [
+        StudyConfig(**f["spec"]) for f in sel["finalists"]
+    ]
+    settings = load_settings()
+    paths = settings.paths
+    docs, _ = _chunk_docs(settings)
+    embedder = SentenceTransformerEmbedder()
+    client = open_client(paths.index)
+    ranked: dict[str, dict[str, list[str]]] = {c.name: {} for c in cfgs}
+    latency: dict[str, list[float]] = {c.name: [] for c in cfgs}
+    try:
+        bm25 = load_bm25(paths.index)
+        # One system at a time with only its rerankers on the GPU: loading every model at once
+        # overcommits 6 GB of VRAM and the driver's system-memory fallback distorts timing.
+        for c in cfgs:
+            models = {n: CrossEncoderReranker.named(n)
+                      for n in {c.scorer, *([c.second] if c.second else [])}}  # fmt: skip
+            try:
+                r = HybridRetriever(client, embedder, bm25, models[c.scorer], docs,
+                                    candidates=max(50, c.pool), rerank_top=c.pool,
+                                    second=models[c.second] if c.second else None, w2=c.w2,
+                                    alpha=c.alpha)  # fmt: skip
+                r.retrieve(qs[0].question, 8)  # warm-up, not timed
+                for q in tqdm(qs, desc=c.name):
+                    t0 = time.perf_counter()
+                    res = r.retrieve(q.question, 8)
+                    latency[c.name].append(time.perf_counter() - t0)
+                    ranked[c.name][q.qid] = res.chunk_ids
+            finally:
+                for m in models.values():
+                    m.release()
+    finally:
+        client.close()
+        embedder.release()
+    report = test_summary(qs, ranked, latency, cfgs[0].name)
+    report["selected"] = sel
+    report["ranked"] = ranked
+    Path(out).parent.mkdir(parents=True, exist_ok=True)
+    Path(out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    typer.echo(json.dumps({k: report[k] for k in ("table", "tests_vs_baseline", "latency_s")},
+                          indent=1))  # fmt: skip
+
+
+# --- query decomposition (D42) -------------------------------------------------------------------
+
+
+class DecompRow(BaseModel):
+    qid: str
+    subs: list[str]
+    llm_s: float
+    lists: list[list[tuple[str, float]]] = []  # per query (original first): CE-ranked top pool
+    orig: dict[str, float] = {}  # original question's CE score for every pooled chunk
+    search_s: float = 0.0  # all first-stage searches + CE passes
+
+
+@app.command("rr-decomp")
+def rr_decomp(split: str = typer.Option("dev"), pool: int = typer.Option(30)) -> None:
+    """Decompose each question with the local LLM, retrieve and rerank per sub-query, and log
+    the three merges against S1 on the split (D42). Test only after the finalists exist."""
+    import time
+
+    from fixgraph.bench.combo import per_question
+    from fixgraph.embeddings import SentenceTransformerEmbedder
+    from fixgraph.llm.factory import build_llm_client
+    from fixgraph.retrieval.decompose import decompose, merge
+    from fixgraph.retrieval.hybrid import HybridRetriever
+    from fixgraph.retrieval.index import load_bm25, open_client
+    from fixgraph.retrieval.rerank import CrossEncoderReranker
+
+    if split != "dev":
+        raise typer.BadParameter("rr-decomp is a dev study; the test run goes through rr-test")
+    settings = load_settings()
+    paths = settings.paths
+    qs = _combo_questions(split)
+    model = settings.llm.answer_model
+    client = build_llm_client(settings)
+    rows: dict[str, DecompRow] = {}
+    try:
+        decompose(client, model, qs[0].question)  # warm-up (model load), not timed
+        for q in tqdm(qs, desc="decompose"):
+            t0 = time.perf_counter()
+            subs = decompose(client, model, q.question)
+            rows[q.qid] = DecompRow(qid=q.qid, subs=subs, llm_s=time.perf_counter() - t0)
+    finally:
+        client.close()
+        _unload(settings, model)
+    docs, _ = _chunk_docs(settings)
+    embedder, reranker = SentenceTransformerEmbedder(), CrossEncoderReranker.named("bge")
+    idx = open_client(paths.index)
+    try:
+        hybrid = HybridRetriever(idx, embedder, load_bm25(paths.index), reranker, docs)
+        for q in tqdm(qs, desc="retrieve"):
+            row = rows[q.qid]
+            t0 = time.perf_counter()
+            for text in [q.question, *row.subs]:
+                cands = [c for c, _ in hybrid.candidates_for(text, pool)]
+                sc = reranker.score(text, [docs[c] for c in cands])
+                row.lists.append(sorted(zip(cands, sc, strict=True), key=lambda x: -x[1]))
+            row.orig = dict(row.lists[0])
+            extra = sorted({c for lst in row.lists[1:] for c, _ in lst} - set(row.orig))
+            if extra:
+                row.orig.update(zip(extra, reranker.score(q.question, [docs[c] for c in extra]),
+                                    strict=True))  # fmt: skip
+            row.search_s = time.perf_counter() - t0
+    finally:
+        idx.close()
+        reranker.release()
+        embedder.release()
+    out = paths.results / "rerank" / f"decomp_{split}.jsonl"
+    out.write_text("".join(r.model_dump_json() + "\n" for r in rows.values()), encoding="utf-8")
+    log = []
+    for how in ("s1", "orig", "max", "rr"):
+        ranked = {
+            q.qid: [c for c, _ in rows[q.qid].lists[0][:8]]
+            if how == "s1" or not rows[q.qid].subs
+            else merge(rows[q.qid].lists, rows[q.qid].orig, how, 8)
+            for q in qs
+        }
+        per = per_question(qs, ranked)
+        entry: dict[str, object] = {"merge": how}
+        for sub in ("all", "main", "multi_constraint", "bridge", "bridge_direct"):
+            sel = [q for q in qs if sub == "all" or (sub == "main" and q.qtype not in (
+                "bridge", "bridge_direct")) or q.qtype == sub]  # fmt: skip
+            rec = [per[q.qid]["recall@8"] for q in sel]
+            entry[sub] = {"n": len(sel), "recall@8": round(sum(rec) / len(rec), 4)}
+        if how != "s1":  # S1's own latency is in dev_log.json; this is the decomposed pipeline
+            lat = [rows[q.qid].search_s + rows[q.qid].llm_s for q in qs]
+            entry["latency_s_mean"] = round(sum(lat) / len(lat), 4)
+        log.append(entry)
+        typer.echo(json.dumps(entry))
+    n_split = sum(bool(r.subs) for r in rows.values())
+    _RR.mkdir(parents=True, exist_ok=True)
+    (_RR / "decomp_dev_log.json").write_text(
+        json.dumps({"n_dev": len(qs), "n_decomposed": n_split, "model": model, "pool": pool,
+                    "merges": log}, indent=2) + "\n", encoding="utf-8")  # fmt: skip
+    typer.echo(f"{n_split}/{len(qs)} questions decomposed")
+
+
+@app.command("rr-latency")
+def rr_latency(split: str = typer.Option("test")) -> None:
+    """Timing-only rerun of the baseline and finalists (no metrics): per-query retrieval seconds
+    with one system on the GPU at a time, saved raw so outliers can be inspected."""
+    import time
+
+    from fixgraph.bench.rerank_study import StudyConfig
+    from fixgraph.embeddings import SentenceTransformerEmbedder
+    from fixgraph.retrieval.hybrid import HybridRetriever
+    from fixgraph.retrieval.index import load_bm25, open_client
+    from fixgraph.retrieval.rerank import CrossEncoderReranker
+
+    sel = json.loads((_RR / "selected.json").read_text(encoding="utf-8"))
+    cfgs = [StudyConfig(**sel["baseline"]["spec"])] + [
+        StudyConfig(**f["spec"]) for f in sel["finalists"]
+    ]
+    settings = load_settings()
+    docs, _ = _chunk_docs(settings)
+    qs = _combo_questions(split)
+    embedder = SentenceTransformerEmbedder()
+    client = open_client(settings.paths.index)
+    raw: dict[str, list[float]] = {}
+    ranked: dict[str, dict[str, list[str]]] = {}
+    try:
+        bm25 = load_bm25(settings.paths.index)
+        for c in cfgs:
+            models = {n: CrossEncoderReranker.named(n)
+                      for n in {c.scorer, *([c.second] if c.second else [])}}  # fmt: skip
+            try:
+                r = HybridRetriever(client, embedder, bm25, models[c.scorer], docs,
+                                    candidates=max(50, c.pool), rerank_top=c.pool,
+                                    second=models[c.second] if c.second else None, w2=c.w2,
+                                    alpha=c.alpha)  # fmt: skip
+                r.retrieve(qs[0].question, 8)
+                raw[c.name], ranked[c.name] = [], {}
+                for q in tqdm(qs, desc=c.name):
+                    t0 = time.perf_counter()
+                    res = r.retrieve(q.question, 8)
+                    raw[c.name].append(round(time.perf_counter() - t0, 4))
+                    ranked[c.name][q.qid] = res.chunk_ids
+            finally:
+                for m in models.values():
+                    m.release()
+    finally:
+        client.close()
+        embedder.release()
+    summary = {}
+    for name, xs in raw.items():
+        s = sorted(xs)
+        summary[name] = {"n": len(s), "mean": round(sum(s) / len(s), 4), "p50": s[len(s) // 2],
+                         "p95": s[max(0, int(len(s) * 0.95) - 1)], "max": s[-1]}  # fmt: skip
+    # Top-8 agreement with the locked test run: a speed-only change must not change the sets.
+    report_path = _RR / "test_report.json"
+    if split == "test" and report_path.exists():
+        locked = json.loads(report_path.read_text(encoding="utf-8"))["ranked"]
+        for name in summary:
+            same = sum(set(ranked[name][q]) == set(locked[name][q]) for q in ranked[name])
+            summary[name]["same_top8_as_test_run"] = f"{same}/{len(ranked[name])}"
+    (_RR / f"latency_{split}.json").write_text(
+        json.dumps({"summary": summary, "raw": raw, "ranked": ranked}, indent=1) + "\n",
+        encoding="utf-8",
+    )
+    typer.echo(json.dumps(summary, indent=1))
