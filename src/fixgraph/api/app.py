@@ -130,12 +130,18 @@ def _hybrid_factory(settings: Settings, chunk_text: dict[str, str]) -> Callable[
         from fixgraph.retrieval.rerank import CrossEncoderReranker
 
         index_dir = settings.paths.index
+        rs = settings.retrieval
+        second = rs.second_reranker
         return HybridRetriever(
             open_client(index_dir),
             SentenceTransformerEmbedder(),
             load_bm25(index_dir),
-            CrossEncoderReranker(),
+            CrossEncoderReranker.named(rs.reranker),
             chunk_text,
+            rerank_top=rs.rerank_top,
+            second=CrossEncoderReranker.named(second) if second else None,
+            w2=rs.second_weight,
+            alpha=rs.first_stage_weight,
         )
 
     return build

@@ -37,6 +37,18 @@ class LLMSettings(BaseModel):
     cache_path: Path = Path("data/cache/llm_cache.sqlite")
 
 
+class RetrievalSettings(BaseModel):
+    """S1's rerank stage (DECISIONS.md D39-D41). Names come from retrieval.rerank.RERANKERS.
+    Default = the benchmarked S1. The recall-oriented variant from the reranking study is
+    `second_reranker: qwen` with `second_weight: 0.5` (about 2.8x the retrieval latency)."""
+
+    reranker: str = "bge"
+    rerank_top: int = 30
+    second_reranker: str | None = None
+    second_weight: float = 0.0
+    first_stage_weight: float = 0.0
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -50,6 +62,7 @@ class Settings(BaseSettings):
     data_dir: Path = Path("data")
     seed: int = 13
     llm: LLMSettings = LLMSettings()
+    retrieval: RetrievalSettings = RetrievalSettings()
 
     @classmethod
     def settings_customise_sources(

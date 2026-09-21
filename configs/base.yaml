@@ -15,3 +15,10 @@ llm:
   keep_alive: 2m
   timeout_s: 300
   cache_path: data/cache/llm_cache.sqlite
+
+retrieval:                     # S1's rerank stage (DECISIONS.md D39-D41)
+  reranker: bge                # bge-reranker-v2-m3, top 30 fused candidates
+  rerank_top: 30
+  second_reranker: null        # set to qwen with second_weight 0.5 for the recall-oriented
+  second_weight: 0.0           #   blend (+0.018 held-out recall@8, ~2.8x retrieval latency)
+  first_stage_weight: 0.0

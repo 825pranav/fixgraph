@@ -22,7 +22,7 @@ TROUBLESHOOT_PROMPT = (
 # Named reranker settings compared in the reranking study (DECISIONS.md D39):
 # name -> (model, max_length in tokens, instruction prompt or None for the model default).
 # Qwen3-Reranker runs with batch size 4: a batch of 16 padded to 1024 tokens overflows 6 GB of
-# VRAM into the driver's system-memory fallback (13-17 s queries in results/rerank).
+# VRAM into the driver's system-memory fallback (13-18 s queries in the first timing run).
 RERANKERS: dict[str, tuple[str, int, str | None]] = {
     "bge": (DEFAULT_RERANKER, 512, None),
     "bge1024": (DEFAULT_RERANKER, 1024, None),

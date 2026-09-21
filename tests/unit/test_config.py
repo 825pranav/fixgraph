@@ -40,3 +40,12 @@ def test_factory_wraps_in_cache(monkeypatch: pytest.MonkeyPatch, tmp_path: Path)
     client = build_llm_client(load_settings())
     assert isinstance(client, CachedLLMClient)
     client.close()
+
+
+def test_retrieval_defaults_are_the_benchmarked_s1(monkeypatch: pytest.MonkeyPatch) -> None:
+    s = load_settings()
+    assert s.retrieval.reranker == "bge" and s.retrieval.second_reranker is None
+    monkeypatch.setenv("RETRIEVAL__SECOND_RERANKER", "qwen")
+    monkeypatch.setenv("RETRIEVAL__SECOND_WEIGHT", "0.5")
+    s = load_settings()
+    assert s.retrieval.second_reranker == "qwen" and s.retrieval.second_weight == 0.5
