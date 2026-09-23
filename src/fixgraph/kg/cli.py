@@ -79,9 +79,15 @@ def build(
     settings = load_settings()
     paths = settings.paths
     model = model or settings.llm.extraction_model
-    records = read_records(output_path(paths.extractions, model))
+    in_corpus = {c.chunk_id for c in read_chunks(paths.chunks)}
+    records = [
+        r for r in read_records(output_path(paths.extractions, model)) if r.chunk_id in in_corpus
+    ]
     if not records:
         raise typer.BadParameter(f"no extractions for {model}; run `fixgraph kg extract` first")
+    missing = len(in_corpus) - len({r.chunk_id for r in records if r.ok})
+    if missing:
+        logger.warning("%d corpus chunks have no successful extraction yet", missing)
     target = Path(out_dir) if out_dir else (paths.kg if canonicalize else paths.root / "kg_nocanon")
     embedder = SentenceTransformerEmbedder()
     client = build_llm_client(settings) if adjudicate else None
