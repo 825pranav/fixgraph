@@ -11,7 +11,7 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
-from fixgraph.core.paths import DEFAULT_CONFIG_FILE, REPO_ROOT
+from fixgraph.core.paths import DEFAULT_CONFIG_FILE, REPO_ROOT, DataPaths
 
 LLMBackend = Literal["ollama", "openai", "fake"]
 
@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     def resolve(self, path: Path) -> Path:
         """Resolve a configured relative path against the repo root."""
         return path if path.is_absolute() else REPO_ROOT / path
+
+    @property
+    def paths(self) -> DataPaths:
+        return DataPaths(self.resolve(self.data_dir))
 
 
 def load_settings(**overrides: object) -> Settings:

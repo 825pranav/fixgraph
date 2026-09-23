@@ -3,6 +3,7 @@
 import hashlib
 import json
 import sqlite3
+import threading
 from pathlib import Path
 from types import TracebackType
 from typing import Self
@@ -18,7 +19,8 @@ def cache_key(request: LLMRequest) -> str:
 class SQLiteCache:
     def __init__(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        # check_same_thread=False: callers may run 1-2 concurrent requests from a thread pool.
+        # Callers may run 1-2 concurrent requests from a thread pool; one lock serializes access.
+        self._lock = threading.Lock()
         self._conn = sqlite3.connect(path, check_same_thread=False)
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS responses (key TEXT PRIMARY KEY, response TEXT NOT NULL)"
@@ -26,21 +28,27 @@ class SQLiteCache:
         self._conn.commit()
 
     def get(self, key: str) -> LLMResponse | None:
-        row = self._conn.execute("SELECT response FROM responses WHERE key = ?", (key,)).fetchone()
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT response FROM responses WHERE key = ?", (key,)
+            ).fetchone()
         return None if row is None else LLMResponse.model_validate_json(row[0])
 
     def put(self, key: str, response: LLMResponse) -> None:
-        self._conn.execute(
-            "INSERT OR REPLACE INTO responses (key, response) VALUES (?, ?)",
-            (key, response.model_dump_json()),
-        )
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                "INSERT OR REPLACE INTO responses (key, response) VALUES (?, ?)",
+                (key, response.model_dump_json()),
+            )
+            self._conn.commit()
 
     def __len__(self) -> int:
-        return int(self._conn.execute("SELECT COUNT(*) FROM responses").fetchone()[0])
+        with self._lock:
+            return int(self._conn.execute("SELECT COUNT(*) FROM responses").fetchone()[0])
 
     def close(self) -> None:
-        self._conn.close()
+        with self._lock:
+            self._conn.close()
 
     def __enter__(self) -> Self:
         return self

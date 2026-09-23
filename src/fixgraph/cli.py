@@ -7,12 +7,16 @@ from pydantic import BaseModel
 
 from fixgraph import __version__
 from fixgraph.core.config import load_settings
+from fixgraph.ingest.cli import app as ingest_app
+from fixgraph.kg.cli import app as kg_app
 from fixgraph.llm import ChatMessage, LLMRequest, complete_structured
 from fixgraph.llm.factory import build_llm_client
 
 app = typer.Typer(no_args_is_help=True, help="FixGraph: troubleshooting KG + GraphRAG benchmark.")
 llm_app = typer.Typer(no_args_is_help=True, help="LLM backend utilities.")
 app.add_typer(llm_app, name="llm")
+app.add_typer(ingest_app, name="ingest")
+app.add_typer(kg_app, name="kg")
 
 
 @app.callback()
