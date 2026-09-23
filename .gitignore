@@ -23,3 +23,6 @@ data/*
 !data/bench/
 mlruns/
 mlartifacts/
+
+# Local planning notes (not part of the published project)
+PROJECT_SPEC.md

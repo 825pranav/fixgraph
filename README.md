@@ -173,7 +173,9 @@ unsupported claims.
 
 ## Reproduce
 
-Windows 11, no WSL (see `PROJECT_SPEC.md` §5 for machine setup).
+Tested on native Windows 11 (no WSL) with an NVIDIA RTX 4050 Laptop GPU (6 GB), 16 GB RAM.
+Prerequisites: [uv](https://docs.astral.sh/uv/), [Ollama](https://ollama.com), a recent NVIDIA
+driver (PyTorch wheels bundle the CUDA runtime).
 
 ```powershell
 uv sync

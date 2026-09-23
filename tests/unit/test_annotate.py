@@ -33,8 +33,7 @@ def test_sample_is_stratified_deterministic_one_per_article() -> None:
 def test_review_loop_accept_edit_skip_quit(tmp_path: Path) -> None:
     path = tmp_path / "gold.jsonl"
     gold = [
-        GoldChunk(chunk_id=f"{a}:0:0", annotator="ai-draft", entities=[])
-        for a in ("1", "2", "3")
+        GoldChunk(chunk_id=f"{a}:0:0", annotator="ai-draft", entities=[]) for a in ("1", "2", "3")
     ]
     write_gold(gold, path)
     keys = iter(["a", "e", "a", "s", "q"])
