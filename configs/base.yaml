@@ -1,0 +1,17 @@
+# Base configuration. Precedence: CLI/init > environment (e.g. LLM__BACKEND) > .env > this file.
+data_dir: data
+seed: 13
+
+llm:
+  backend: ollama              # ollama (native /api/chat) | openai (any /v1 endpoint) | fake
+  base_url: http://localhost:11434/v1
+  extraction_model: qwen3:4b
+  answer_model: qwen3:4b
+  linking_model: qwen3:4b
+  judge_model: qwen3:8b
+  num_ctx: 8192
+  temperature: 0.0
+  think: false                 # Qwen3 thinking off for extraction/judging (DECISIONS.md)
+  keep_alive: 2m
+  timeout_s: 300
+  cache_path: data/cache/llm_cache.sqlite

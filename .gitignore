@@ -1,0 +1,25 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Tooling caches
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+
+# Secrets
+.env
+
+# Data: never commit raw article text or large files (spec §6.1). Gold + benchmark are committed.
+data/*
+!data/gold/
+!data/bench/
+mlruns/
+mlartifacts/
