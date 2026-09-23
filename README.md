@@ -19,6 +19,10 @@ bge-reranker-v2-m3). Inference cost: $0.
 > extraction gold set were drafted by an AI assistant from the corpus text and are **not yet
 > human-verified**; judge–human agreement (κ) is **not yet measured**. Treat the numbers as a
 > working baseline, not the final answer to the research question. See [Limitations](#limitations).
+>
+> Every number below comes from committed artifacts in [`results/`](results/):
+> `results/dev/report.{md,json}` (benchmark, per-question metrics), `results/kg/stats.json` and
+> `results/kg/extraction_eval_vs_draft_gold.json` (knowledge graph), `results/gnn/results.{md,json}`.
 
 ### Answering (30 questions, qwen3:4b answers, qwen3:8b judge; mean [95% bootstrap CI])
 
@@ -126,7 +130,9 @@ data/gold, data/bench   committed annotations and questions (no raw article text
   extraction gold set were drafted by an AI assistant; they are marked `verified: false` /
   `status: draft` until reviewed with `fixgraph bench verify` and `fixgraph kg annotate`.
 - **No judge validation yet.** The qwen3:8b judge has not been compared with human labels
-  (target: κ ≥ 0.6 on 80–100 answers).
+  (target: κ ≥ 0.6 on 80–100 answers). The blind labeling tool is in place:
+  `fixgraph bench label` (keys 1 / 5 / 0 per answer, system name hidden) and
+  `fixgraph bench kappa` report Cohen's κ and exact agreement against the judge.
 - **Small, easy benchmark.** 30 questions give wide CIs; single-article questions put hybrid
   RAG at the recall ceiling, so the benchmark cannot yet show where graphs should help.
 - **Time-boxed corpus.** 500 of 2,531 chunks (whole articles, highest troubleshooting

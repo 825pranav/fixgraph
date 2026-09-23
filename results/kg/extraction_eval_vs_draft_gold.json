@@ -1,0 +1,200 @@
+{
+  "gold_chunks": 50,
+  "qwen3:4b": {
+    "missing_predictions": 0,
+    "seconds_per_chunk": 8.33,
+    "entities": [
+      {
+        "name": "ALL",
+        "tp": 187,
+        "fp": 142,
+        "fn": 183,
+        "precision": 0.568,
+        "recall": 0.505,
+        "f1": 0.535
+      },
+      {
+        "name": "Cause",
+        "tp": 8,
+        "fp": 32,
+        "fn": 21,
+        "precision": 0.2,
+        "recall": 0.276,
+        "f1": 0.232
+      },
+      {
+        "name": "Component",
+        "tp": 13,
+        "fp": 25,
+        "fn": 11,
+        "precision": 0.342,
+        "recall": 0.542,
+        "f1": 0.419
+      },
+      {
+        "name": "ErrorCode",
+        "tp": 0,
+        "fp": 0,
+        "fn": 2,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      {
+        "name": "Feature",
+        "tp": 1,
+        "fp": 1,
+        "fn": 47,
+        "precision": 0.5,
+        "recall": 0.021,
+        "f1": 0.04
+      },
+      {
+        "name": "Fix",
+        "tp": 42,
+        "fp": 64,
+        "fn": 50,
+        "precision": 0.396,
+        "recall": 0.457,
+        "f1": 0.424
+      },
+      {
+        "name": "OSVersion",
+        "tp": 14,
+        "fp": 8,
+        "fn": 8,
+        "precision": 0.636,
+        "recall": 0.636,
+        "f1": 0.636
+      },
+      {
+        "name": "Product",
+        "tp": 79,
+        "fp": 4,
+        "fn": 25,
+        "precision": 0.952,
+        "recall": 0.76,
+        "f1": 0.845
+      },
+      {
+        "name": "Symptom",
+        "tp": 30,
+        "fp": 8,
+        "fn": 19,
+        "precision": 0.789,
+        "recall": 0.612,
+        "f1": 0.69
+      }
+    ],
+    "relations": [
+      {
+        "name": "ADDRESSES",
+        "tp": 0,
+        "fp": 33,
+        "fn": 7,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      {
+        "name": "ALL",
+        "tp": 104,
+        "fp": 202,
+        "fn": 148,
+        "precision": 0.34,
+        "recall": 0.413,
+        "f1": 0.373
+      },
+      {
+        "name": "APPLIES_TO",
+        "tp": 3,
+        "fp": 12,
+        "fn": 0,
+        "precision": 0.2,
+        "recall": 1.0,
+        "f1": 0.333
+      },
+      {
+        "name": "CAUSED_BY",
+        "tp": 7,
+        "fp": 25,
+        "fn": 23,
+        "precision": 0.219,
+        "recall": 0.233,
+        "f1": 0.226
+      },
+      {
+        "name": "DEPENDS_ON",
+        "tp": 1,
+        "fp": 1,
+        "fn": 3,
+        "precision": 0.5,
+        "recall": 0.25,
+        "f1": 0.333
+      },
+      {
+        "name": "EXHIBITS",
+        "tp": 42,
+        "fp": 17,
+        "fn": 11,
+        "precision": 0.712,
+        "recall": 0.792,
+        "f1": 0.75
+      },
+      {
+        "name": "HAS_COMPONENT",
+        "tp": 4,
+        "fp": 27,
+        "fn": 2,
+        "precision": 0.129,
+        "recall": 0.667,
+        "f1": 0.216
+      },
+      {
+        "name": "INVOLVES",
+        "tp": 4,
+        "fp": 13,
+        "fn": 25,
+        "precision": 0.235,
+        "recall": 0.138,
+        "f1": 0.174
+      },
+      {
+        "name": "REQUIRES",
+        "tp": 3,
+        "fp": 6,
+        "fn": 14,
+        "precision": 0.333,
+        "recall": 0.176,
+        "f1": 0.231
+      },
+      {
+        "name": "RESOLVED_BY",
+        "tp": 34,
+        "fp": 56,
+        "fn": 59,
+        "precision": 0.378,
+        "recall": 0.366,
+        "f1": 0.372
+      },
+      {
+        "name": "RUNS",
+        "tp": 6,
+        "fp": 12,
+        "fn": 2,
+        "precision": 0.333,
+        "recall": 0.75,
+        "f1": 0.462
+      },
+      {
+        "name": "SIGNALS",
+        "tp": 0,
+        "fp": 0,
+        "fn": 2,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    ]
+  }
+}
