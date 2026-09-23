@@ -135,3 +135,12 @@ adjudication for borderline cluster pairs (similarity band just below the thresh
 at 500 pairs, cached. Every merge is logged to `data/kg/merges.jsonl`.
 Sanity check: paraphrases score 0.91–0.98 cosine, different problems 0.4–0.7, so default
 distance thresholds 0.10–0.12 sit in the gap; tuned on labeled pairs below.
+
+### D20: Time-boxed working corpus (500 chunks)
+The developer is time-constrained, so the working corpus is cut from 1,000 articles / 2,531
+chunks to **220 whole articles / 500 chunks** (`fixgraph ingest subset --max-chunks 500`):
+the 50 gold-set articles are always kept, the rest are the highest-relevance articles that fit.
+Every system (RAG and GraphRAG) indexes the same 500 chunks, so the comparison stays fair; the
+full corpus is kept in `articles_full.parquet` / `chunks_full.parquet` and the pipeline can be
+rerun at full size. Cost: a smaller graph (fewer multi-hop paths, sparser GNN training data)
+and wider confidence intervals; per-chunk extraction quality is unchanged.

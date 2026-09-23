@@ -33,6 +33,12 @@ def test_os_versions(onto: Ontology) -> None:
     ]
 
 
+def test_macos_names_with_and_without_numbers(onto: Ontology) -> None:
+    assert onto.os_versions_in("a Mac with macOS Catalina or later") == ["macOS 10.15"]
+    assert onto.os_versions_in("update to macOS Ventura 13.5 or later") == ["macOS 13.5"]
+    assert onto.os_versions_in("macOS High Sierra") == ["macOS 10.13"]
+
+
 def test_parse_os_version() -> None:
     assert parse_os_version("iOS 26.1") == ("iOS", 26, 1, 0)
     assert parse_os_version("macOS 15.2.3") == ("macOS", 15, 2, 3)

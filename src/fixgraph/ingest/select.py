@@ -46,3 +46,27 @@ def select_corpus(articles: list[Article], ontology: Ontology, target: int) -> l
     kept.sort(key=lambda sa: (-sa[0], int(sa[1].article_id)))
     chosen = [a for _, a in kept[:target]]
     return sorted(chosen, key=lambda a: int(a.article_id))
+
+
+def subset_by_chunk_budget(
+    articles: list[Article],
+    chunk_counts: dict[str, int],
+    ontology: Ontology,
+    max_chunks: int,
+    must_keep: set[str] | None = None,
+) -> list[Article]:
+    """Whole articles under a chunk budget: `must_keep` first (e.g. gold-set articles), then by
+    relevance (ties by id). Articles never split, so every kept article is fully covered."""
+    must = must_keep or set()
+    order = sorted(
+        articles,
+        key=lambda a: (a.article_id not in must, -relevance(a, ontology), int(a.article_id)),
+    )
+    kept: list[Article] = []
+    used = 0
+    for a in order:
+        n = chunk_counts.get(a.article_id, 0)
+        if a.article_id in must or used + n <= max_chunks:
+            kept.append(a)
+            used += n
+    return sorted(kept, key=lambda a: int(a.article_id))

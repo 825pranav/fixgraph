@@ -18,4 +18,33 @@ jobs:
       - run: uv python install 3.12
       - run: uv sync --locked
       - run: uv run poe check
-  # M7 adds a docker job: build docker/api.Dockerfile (CPU torch) and smoke-test /health.
+
+  docker:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build image (CPU torch, fake LLM)
+        run: docker build -f docker/api.Dockerfile -t fixgraph-api .
+      - name: Start container
+        run: docker run -d --name api -p 8000:8000 fixgraph-api
+      - name: Wait for /health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8000/health; then exit 0; fi
+            sleep 2
+          done
+          docker logs api
+          exit 1
+      - name: Smoke-test /health and /answer
+        run: |
+          curl -fsS http://localhost:8000/health | tee health.json
+          grep -q '"status":"ok"' health.json
+          curl -fsS -X POST http://localhost:8000/answer \
+            -H 'Content-Type: application/json' \
+            -d '{"question": "My Apple Watch will not pair with my iPhone", "system": "S1"}' \
+            | tee answer.json
+          grep -q '"citations":\["demo:0:0"\]' answer.json
+      - name: Container logs
+        if: always()
+        run: docker logs api || true

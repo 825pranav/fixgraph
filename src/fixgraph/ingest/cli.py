@@ -12,8 +12,8 @@ from fixgraph.core.ontology import load_ontology
 from fixgraph.ingest.chunk import chunk_article
 from fixgraph.ingest.parse import parse_file
 from fixgraph.ingest.scrape import Scraper
-from fixgraph.ingest.select import select_corpus
-from fixgraph.ingest.store import read_articles, write_articles, write_chunks
+from fixgraph.ingest.select import select_corpus, subset_by_chunk_budget
+from fixgraph.ingest.store import read_articles, read_chunks, write_articles, write_chunks
 
 logger = logging.getLogger(__name__)
 app = typer.Typer(no_args_is_help=True, help="Corpus ingestion: scrape -> parse -> chunk.")
@@ -81,4 +81,41 @@ def chunk(
         f"{len(chunks)} chunks from {len(articles)} articles -> {paths.chunks}\n"
         f"tokens: min {sizes[0]}, median {sizes[len(sizes) // 2]}, max {sizes[-1]}, "
         f"total {sum(sizes):,}"
+    )
+
+
+@app.command()
+def subset(
+    max_chunks: int = typer.Option(1000, help="Chunk budget for the working corpus."),
+) -> None:
+    """Shrink the working corpus to whole articles under a chunk budget (time-boxed runs).
+
+    The full corpus is kept as articles_full.parquet / chunks_full.parquet; gold-set articles are
+    always kept. Chunk IDs are unchanged, so existing extractions stay valid.
+    """
+    import shutil
+
+    paths = load_settings().paths
+    full_articles = paths.corpus / "articles_full.parquet"
+    full_chunks = paths.corpus / "chunks_full.parquet"
+    if not full_articles.exists():
+        shutil.copyfile(paths.articles, full_articles)
+        shutil.copyfile(paths.chunks, full_chunks)
+    articles = read_articles(full_articles)
+    chunks = read_chunks(full_chunks)
+    counts = Counter(c.article_id for c in chunks)
+    gold_ids = paths.gold / "gold_chunk_ids.txt"
+    must = (
+        {line.split(":")[0] for line in gold_ids.read_text(encoding="utf-8").split()}
+        if gold_ids.exists()
+        else set()
+    )
+    kept = subset_by_chunk_budget(articles, counts, load_ontology(), max_chunks, must)
+    keep_ids = {a.article_id for a in kept}
+    kept_chunks = [c for c in chunks if c.article_id in keep_ids]
+    write_articles(kept, paths.articles)
+    write_chunks(kept_chunks, paths.chunks)
+    typer.echo(
+        f"kept {len(kept)}/{len(articles)} articles, {len(kept_chunks)}/{len(chunks)} chunks "
+        f"({len(must)} gold articles always kept)"
     )
