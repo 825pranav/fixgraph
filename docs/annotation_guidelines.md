@@ -35,6 +35,6 @@ DEPENDS_ON (Product→Product), HAS_COMPONENT (Product→Component).
 
 ## Status
 
-Every record carries `annotator` and `status`. The first 50 drafts were written by Claude
-(AI assistant) following these rules and are marked `status: draft` until the developer reviews
-them. Headline extraction metrics state whether they were computed on draft or reviewed gold.
+Every record carries `annotator` and `status`. The first 50 drafts were produced with an
+AI assistant following these rules (`annotator: ai-draft`) and are marked `status: draft` until
+the developer reviews them. Headline extraction metrics state whether they were computed on draft or reviewed gold.

@@ -33,7 +33,7 @@ def test_sample_is_stratified_deterministic_one_per_article() -> None:
 def test_review_loop_accept_edit_skip_quit(tmp_path: Path) -> None:
     path = tmp_path / "gold.jsonl"
     gold = [
-        GoldChunk(chunk_id=f"{a}:0:0", annotator="claude-draft", entities=[])
+        GoldChunk(chunk_id=f"{a}:0:0", annotator="ai-draft", entities=[])
         for a in ("1", "2", "3")
     ]
     write_gold(gold, path)
@@ -56,5 +56,5 @@ def test_review_loop_accept_edit_skip_quit(tmp_path: Path) -> None:
     assert n == 2
     saved = read_gold(path)
     assert [g.status for g in saved] == ["reviewed", "reviewed", "draft"]
-    assert saved[0].annotator == "claude-draft+dev"
+    assert saved[0].annotator == "ai-draft+dev"
     assert saved[1].entities[0].text == "restart it"
