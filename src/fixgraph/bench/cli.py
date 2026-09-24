@@ -3,11 +3,13 @@
 import json
 import logging
 from pathlib import Path
+from typing import cast, get_args
 
 import typer
+from tqdm import tqdm
 
 from fixgraph.bench import run as R
-from fixgraph.bench.schema import read_questions
+from fixgraph.bench.schema import Question, QuestionFilter, read_questions, select_questions
 from fixgraph.core.config import Settings, load_settings
 from fixgraph.ingest.store import read_articles, read_chunks
 from fixgraph.retrieval.index import chunk_document
@@ -60,6 +62,16 @@ def index_build() -> None:
     typer.echo(f"indexed {len(chunks)} chunks -> {paths.index}")
 
 
+_WHICH_HELP = "all | screened (auto-screen passed or human-verified) | verified (human only)."
+
+
+def _load_questions(questions_file: str, which: str, limit: int | None) -> list[Question]:
+    if which not in get_args(QuestionFilter):
+        raise typer.BadParameter(f"--questions must be one of {get_args(QuestionFilter)}")
+    selected = select_questions(read_questions(Path(questions_file)), cast(QuestionFilter, which))
+    return selected[: limit or None]
+
+
 def _unload(settings: Settings, model: str) -> None:
     if settings.llm.backend == "ollama":
         from fixgraph.llm.ollama import OllamaClient
@@ -78,13 +90,14 @@ def bench_run(
     limit: int | None = typer.Option(None, help="Only the first N questions (smoke runs)."),
     type_weights: bool = typer.Option(True, help="--no-type-weights = PPR ablation."),
     kg_dir: str | None = typer.Option(None, help="Alternative KG (e.g. data/kg_nocanon)."),
+    which: str = typer.Option("all", "--questions", help=_WHICH_HELP),
 ) -> None:
     """Run benchmark stages; one heavy model on the GPU at a time."""
     from fixgraph.llm.factory import build_llm_client
 
     settings = load_settings()
     paths = settings.paths
-    questions = read_questions(Path(questions_file))[: limit or None]
+    questions = _load_questions(questions_file, which, limit)
     out = paths.results / run_name
     system_list = [s.strip() for s in systems.split(",") if s.strip()]
     stage_list = [s.strip() for s in stages.split(",")]
@@ -130,12 +143,12 @@ def bench_run(
             _unload(settings, judge_model)
 
     if "report" in stage_list:
-        report_(run_name=run_name, questions_file=questions_file, limit=limit)
+        report_(run_name=run_name, questions_file=questions_file, limit=limit, which=which)
 
 
 def _retrieve(
     settings: Settings,
-    questions: list,  # type: ignore[type-arg]
+    questions: list[Question],
     system_list: list[str],
     out: Path,
     type_weights: bool,
@@ -193,11 +206,12 @@ def report_(
     run_name: str = typer.Option("dev"),
     questions_file: str = typer.Option("data/bench/dev_handwritten.jsonl"),
     limit: int | None = typer.Option(None),
+    which: str = typer.Option("all", "--questions", help=_WHICH_HELP),
 ) -> None:
     """Metrics with bootstrap CIs, significance tests, per-type table; logs to MLflow."""
     settings = load_settings()
     out = settings.paths.results / run_name
-    questions = read_questions(Path(questions_file))[: limit or None]
+    questions = _load_questions(questions_file, which, limit)
     retrievals = [R.RetrievalRow.model_validate(r) for r in R._read(out / "retrieval.jsonl")]
     answers = [R.AnswerRow.model_validate(r) for r in R._read(out / "answers.jsonl")]
     judged = [R.JudgeRow.model_validate(r) for r in R._read(out / "judged.jsonl")]
@@ -222,9 +236,24 @@ def report_(
     typer.echo(md)
 
 
+# Default mix for the test set: multi-article types dominate; single_hop is the control group.
+DEFAULT_MIX = (
+    "single_hop=40,multi_constraint=80,version_conditional=30,cross_device=30,error_code=11"
+)
+
+
+def _parse_mix(mix: str) -> dict[str, int]:
+    """Parse `single_hop=40,multi_constraint=80` into {"single_hop": 40, "multi_constraint": 80}."""
+    out: dict[str, int] = {}
+    for part in mix.split(","):
+        name, _, n = part.partition("=")
+        out[name.strip()] = int(n)
+    return out
+
+
 @app.command("generate")
 def bench_generate(
-    per_type: int = typer.Option(10, help="Paths sampled per question type."),
+    mix: str = typer.Option(DEFAULT_MIX, help="Paths per question type, e.g. single_hop=40,..."),
     out_file: str = typer.Option("data/bench/generated.jsonl"),
 ) -> None:
     """Generate questions from KG paths with the judge-class model (unverified until reviewed)."""
@@ -235,16 +264,14 @@ def bench_generate(
 
     settings = load_settings()
     _, chunk_text = _chunk_docs(settings)
-    samples = sample_paths(read_kg(settings.paths.kg), per_type)
+    samples = sample_paths(read_kg(settings.paths.kg), _parse_mix(mix), seed=settings.seed)
     client = build_llm_client(settings)
+    qs = []
     try:
-        qs = [
-            q
-            for i, s in enumerate(samples)
-            if (
-                q := generate_question(client, s, chunk_text, settings.llm.judge_model, f"g{i:03d}")
-            )
-        ]
+        for i, s in enumerate(tqdm(samples, desc="generate")):
+            q = generate_question(client, s, chunk_text, settings.llm.judge_model, f"t{i:03d}")
+            if q is not None:
+                qs.append(q)
     finally:
         client.close()
         _unload(settings, settings.llm.judge_model)
@@ -252,19 +279,65 @@ def bench_generate(
     typer.echo(f"{len(qs)} questions from {len(samples)} paths -> {out_file}")
 
 
+@app.command("screen")
+def bench_screen(
+    questions_file: str = typer.Option("data/bench/generated.jsonl"),
+    rescreen: bool = typer.Option(False, help="Re-run questions that already have a verdict."),
+) -> None:
+    """Automatic pre-screen (answerable? supported? leaks answer? truly multi-article?).
+
+    Advisory only: results are stored on each question and shown during `bench verify`."""
+    from collections import Counter
+
+    from fixgraph.bench.schema import write_questions
+    from fixgraph.bench.screen import review_order, screen_question
+    from fixgraph.kg.store import read_kg
+    from fixgraph.llm.factory import build_llm_client
+
+    settings = load_settings()
+    _, chunk_text = _chunk_docs(settings)
+    nodes = read_kg(settings.paths.kg).nodes
+    node_text = dict(zip(nodes["node_id"], nodes["canonical_text"], strict=True))
+    path = Path(questions_file)
+    qs = read_questions(path)
+    client = build_llm_client(settings)
+    try:
+        for i, q in enumerate(tqdm(qs, desc="screen")):
+            if q.screen is None or rescreen:
+                qs[i] = q.model_copy(
+                    update={
+                        "screen": screen_question(
+                            client, q, chunk_text, settings.llm.judge_model, node_text
+                        )
+                    }
+                )
+                write_questions(qs, path)  # resumable: progress survives a crash
+    finally:
+        client.close()
+        _unload(settings, settings.llm.judge_model)
+    qs = review_order(qs)
+    write_questions(qs, path)
+    passed = Counter(q.qtype for q in qs if q.screen and q.screen.passed)
+    multi = sum(bool(q.screen and q.screen.passed and q.screen.needs_multiple_articles) for q in qs)
+    typer.echo(f"passed {sum(passed.values())}/{len(qs)} ({dict(passed)}); {multi} need >1 article")
+
+
 @app.command("verify")
 def bench_verify(
     questions_file: str = typer.Option("data/bench/generated.jsonl"),
     reviewer: str = typer.Option("developer"),
 ) -> None:
-    """Human verification: [y]es / [n]o (reject) / [s]kip / [q]uit per question."""
+    """Human verification per question (keys: y = keep, n = reject, s = skip, q = quit).
+
+    Screen-passed questions come first, so stopping early keeps the most likely keepers."""
     from fixgraph.bench.generate import verify_loop
     from fixgraph.bench.schema import write_questions
+    from fixgraph.bench.screen import review_order
 
     settings = load_settings()
     _, chunk_text = _chunk_docs(settings)
     path = Path(questions_file)
-    qs = read_questions(path)
+    qs = review_order(read_questions(path))
     n = verify_loop(qs, chunk_text, lambda q: write_questions(q, path), reviewer)
     typer.echo(f"verified {n}; {sum(q.verified for q in qs)}/{len(qs)} verified in file")
 
@@ -276,7 +349,7 @@ def bench_label(
     n: int = typer.Option(80, help="Answers to label (spec: 80-100)."),
     labeler: str = typer.Option("developer"),
 ) -> None:
-    """Blind human labels for judge validation: [1] correct [5] partial [0] wrong."""
+    """Blind human labels for judge validation (keys: 1 = correct, 5 = partial, 0 = wrong)."""
     from fixgraph.bench.validate import (
         agreement,
         label_loop,

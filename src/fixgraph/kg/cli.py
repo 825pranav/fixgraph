@@ -1,4 +1,11 @@
-"""`fixgraph kg extract | resolve | build | eval | ...`."""
+"""`fixgraph kg extract | build | stats | eval | gold-sample | annotate`.
+
+extract runs kg.run_extract over chunks.parquet; build turns the extractions into the parquet KG
+(kg.build, optional LLM adjudication from kg.resolve) and writes it with kg.store; stats / eval
+report graph statistics and gold-set P/R/F1 (kg.quality); gold-sample / annotate drive the
+gold-set tooling (kg.annotate). Used by: cli.py (mounted as `kg`).
+Uses: core.config, core.ontology, ingest.store, llm.factory, llm.ollama, embeddings.
+"""
 
 import json
 import logging
@@ -129,6 +136,8 @@ def stats(kg_dir: str | None = typer.Option(None)) -> None:
 def eval_(
     models: list[str] | None = typer.Option(None, "--model", help="Repeatable; default 4B."),
     gold_file: str | None = typer.Option(None, help="Defaults to data/gold/extraction_gold.jsonl"),
+    status: str = typer.Option("all", help="all | reviewed (only human-reviewed gold chunks)."),
+    out: str | None = typer.Option(None, help="Also write the JSON report to this file."),
 ) -> None:
     """Entity/relation P/R/F1 per type against the gold set, per extraction model."""
     paths = load_settings().paths
@@ -138,7 +147,17 @@ def eval_(
         for line in gold_path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    report: dict[str, object] = {"gold_chunks": len(gold)}
+    if status not in ("all", "reviewed"):
+        raise typer.BadParameter("--status must be 'all' or 'reviewed'")
+    n_reviewed = sum(g.status == "reviewed" for g in gold)
+    if status == "reviewed":
+        gold = [g for g in gold if g.status == "reviewed"]
+    report: dict[str, object] = {
+        "gold_chunks": len(gold),
+        "gold_status": {"reviewed": n_reviewed, "draft": len(gold) - n_reviewed}
+        if status == "all"
+        else {"reviewed": len(gold), "draft": 0},
+    }
     for model in models or ["qwen3:4b"]:
         recs = {r.chunk_id: r for r in read_records(output_path(paths.extractions, model))}
         missing = [g.chunk_id for g in gold if g.chunk_id not in recs]
@@ -151,7 +170,11 @@ def eval_(
             "entities": [prf.row(k) for k, prf in sorted(ent.items())],
             "relations": [prf.row(k) for k, prf in sorted(rel.items())],
         }
-    typer.echo(json.dumps(report, indent=2))
+    text = json.dumps(report, indent=2)
+    if out:
+        Path(out).parent.mkdir(parents=True, exist_ok=True)
+        Path(out).write_text(text + "\n", encoding="utf-8")
+    typer.echo(text)
 
 
 @app.command("gold-sample")
@@ -170,7 +193,7 @@ def gold_sample(n: int = typer.Option(50), seed: int = typer.Option(13)) -> None
 
 @app.command()
 def annotate(reviewer: str = typer.Option("developer")) -> None:
-    """Review draft gold annotations: [a]ccept, [e]dit in Notepad, [s]kip, [q]uit."""
+    """Review draft gold annotations (keys: a = accept, e = edit in Notepad, s = skip, q = quit)."""
     from fixgraph.kg.annotate import read_gold, review_loop, write_gold
 
     paths = load_settings().paths

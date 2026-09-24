@@ -6,6 +6,11 @@ a time (spec §5.4); each stage writes JSONL under data/results/<run>/ and can b
 3. answer    - LLM answer model writes grounded answers from each system's context
 4. judge     - judge model: claim verifier + correctness rubric
 5. report    - metrics, bootstrap CIs, paired permutation tests (Holm), per-type table, MLflow
+
+Used by: `fixgraph bench run | report` (bench/cli.py calls the stage_* functions and
+build_report / render_markdown; bench/cli.py builds the retrievers and logs to MLflow).
+Uses: retrieval.linking (mentions), answer.grounded, answer.verifier, bench.judge,
+bench.metrics, bench.stats.
 """
 
 import json
@@ -172,6 +177,89 @@ def per_question_metrics(
     return m
 
 
+TEST_METRICS = ("correctness", "recall@8", "support_complete@8", "unsupported_rate")
+
+
+def _paired_tests(
+    per: dict[str, dict[str, dict[str, float]]],
+    systems: list[str],
+    baseline: str,
+    metrics: Sequence[str],
+    qids: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Paired permutation test of each system vs `baseline` on shared questions (optionally
+    restricted to `qids`), Holm-corrected across systems within each metric."""
+    tests: list[dict[str, Any]] = []
+    if baseline not in per:
+        return tests
+    for metric in metrics:
+        rows = []
+        for s in systems:
+            if s == baseline:
+                continue
+            shared = [
+                qid
+                for qid in per[s]
+                if (qids is None or qid in qids)
+                and qid in per[baseline]
+                and not math.isnan(per[s][qid].get(metric, math.nan))
+                and not math.isnan(per[baseline][qid].get(metric, math.nan))
+            ]
+            if len(shared) < 3:
+                continue
+            a = [per[s][qid][metric] for qid in shared]
+            b = [per[baseline][qid][metric] for qid in shared]
+            rows.append(
+                {
+                    "metric": metric,
+                    "system": s,
+                    "baseline": baseline,
+                    "n": len(shared),
+                    "diff": sum(a) / len(a) - sum(b) / len(b),
+                    "p": paired_permutation_test(a, b),
+                    "effect_dz": paired_effect_size(a, b),
+                }
+            )
+        for row, adj in zip(rows, holm([r["p"] for r in rows]), strict=True):
+            row["p_holm"] = adj
+        tests.extend(rows)
+    return tests
+
+
+def _by_evidence_span(
+    questions: list[Question], per: dict[str, dict[str, dict[str, float]]], systems: list[str]
+) -> dict[str, dict[str, dict[str, float]]]:
+    """Mean correctness and recall@8 per system, split by whether the gold evidence spans one
+    article or several: the split the graph-vs-RAG research question is about."""
+    span = {
+        q.qid: "multi-article" if len(q.article_ids) > 1 else "single-article" for q in questions
+    }
+    out: dict[str, dict[str, dict[str, float]]] = {}
+    for group in ("single-article", "multi-article"):
+        out[group] = {}
+        for s in systems:
+            rows = [m for qid, m in per[s].items() if span.get(qid) == group]
+            if not rows:
+                continue
+            # S0 is closed-book: it retrieves nothing, so recall is not applicable.
+            recall = [] if s == "S0" else M.nan_drop([m.get("recall@8", math.nan) for m in rows])
+            out[group][s] = {
+                "n": len(rows),
+                "correctness": sum(m["correctness"] for m in rows) / len(rows),
+                "recall@8": sum(recall) / len(recall) if recall else math.nan,
+            }
+    return out
+
+
+def _provenance(questions: list[Question]) -> dict[str, int]:
+    """How much of the question set a human has verified vs only auto-screened."""
+    return {
+        "human_verified": sum(q.verified for q in questions),
+        "auto_screen_passed": sum(bool(q.screen and q.screen.passed) for q in questions),
+        "total": len(questions),
+    }
+
+
 def build_report(
     questions: list[Question],
     retrievals: list[RetrievalRow],
@@ -229,38 +317,9 @@ def build_report(
             "n": abst["tp"] + abst["fn"],
         }
 
-    # Paired significance: baseline vs each other system on shared questions, Holm-corrected.
-    tests: list[dict[str, Any]] = []
-    for metric in ("correctness", "recall@8", "support_complete@8", "unsupported_rate"):
-        rows = []
-        for s in systems:
-            if s == baseline or baseline not in per:
-                continue
-            shared = [
-                qid
-                for qid in per[s]
-                if qid in per[baseline]
-                and not math.isnan(per[s][qid].get(metric, math.nan))
-                and not math.isnan(per[baseline][qid].get(metric, math.nan))
-            ]
-            if len(shared) < 3:
-                continue
-            a = [per[s][qid][metric] for qid in shared]
-            b = [per[baseline][qid][metric] for qid in shared]
-            rows.append(
-                {
-                    "metric": metric,
-                    "system": s,
-                    "baseline": baseline,
-                    "n": len(shared),
-                    "diff": sum(a) / len(a) - sum(b) / len(b),
-                    "p": paired_permutation_test(a, b),
-                    "effect_dz": paired_effect_size(a, b),
-                }
-            )
-        for row, adj in zip(rows, holm([r["p"] for r in rows]), strict=True):
-            row["p_holm"] = adj
-        tests.extend(rows)
+    tests = _paired_tests(per, systems, baseline, TEST_METRICS)
+    multi_qids = {q.qid for q in questions if len(q.article_ids) > 1}
+    subset_tests = _paired_tests(per, systems, baseline, ("correctness", "recall@8"), multi_qids)
 
     by_type: dict[str, dict[str, float]] = defaultdict(dict)
     for s in systems:
@@ -272,11 +331,19 @@ def build_report(
     return {
         "n_questions": len(questions),
         "types": dict(Counter(q.qtype for q in questions)),
+        "provenance": _provenance(questions),
         "table": table,
         "tests": tests,
+        "multi_article_tests": subset_tests,
+        "by_evidence_span": _by_evidence_span(questions, per, systems),
         "correctness_by_type": dict(by_type),
         "per_question": {s: per[s] for s in systems},
     }
+
+
+def _span_cell(v: dict[str, float]) -> str:
+    recall = "—" if math.isnan(v["recall@8"]) else f"{v['recall@8']:.2f}"
+    return f"{v['correctness']:.2f} / {recall} (n={int(v['n'])})"
 
 
 def render_markdown(report: dict[str, Any]) -> str:
@@ -309,6 +376,32 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"| {t['metric']} | {t['system']} | {t['n']} | {t['diff']:+.3f} | {t['p']:.3f} | "
             f"{t['p_holm']:.3f} | {t['effect_dz']:+.2f} |"
         )
+    prov = report.get("provenance")
+    if prov:
+        lines.insert(
+            1,
+            f"Human-verified: {prov['human_verified']}/{prov['total']}; "
+            f"auto-screen passed: {prov['auto_screen_passed']}/{prov['total']}",
+        )
+    spans = report.get("by_evidence_span", {})
+    if any(spans.values()):
+        lines += ["", "By evidence span (correctness / recall@8, n):", ""]
+        lines.append("| evidence | " + " | ".join(systems) + " |")
+        lines.append("|---|" + "---|" * len(systems))
+        for group, vals in spans.items():
+            if not vals:
+                continue
+            cells = [_span_cell(vals[s]) if s in vals else "—" for s in systems]
+            lines.append(f"| {group} | " + " | ".join(cells) + " |")
+    if report.get("multi_article_tests"):
+        lines += ["", "Multi-article questions only, vs S1 (Holm-corrected):", ""]
+        lines.append("| metric | system | n | diff | p | p (Holm) | d_z |")
+        lines.append("|---|---|---|---|---|---|---|")
+        for t in report["multi_article_tests"]:
+            lines.append(
+                f"| {t['metric']} | {t['system']} | {t['n']} | {t['diff']:+.3f} | {t['p']:.3f} | "
+                f"{t['p_holm']:.3f} | {t['effect_dz']:+.2f} |"
+            )
     lines += ["", "Correctness by question type:", ""]
     lines.append("| type | " + " | ".join(systems) + " |")
     lines.append("|---|" + "---|" * len(systems))

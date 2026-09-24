@@ -7,7 +7,9 @@ so no generated text is duplicated into the committed labels file.
 
 import json
 import random
+from collections import defaultdict
 from collections.abc import Callable
+from itertools import zip_longest
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -28,11 +30,19 @@ class HumanLabel(BaseModel):
 def sample_for_labeling(
     keys: list[tuple[str, str]], questions: dict[str, Question], n: int, seed: int = 13
 ) -> list[tuple[str, str]]:
-    """Answerable (qid, system) pairs, shuffled deterministically; unanswerable questions are
-    scored mechanically (abstained or not) so they need no human label."""
-    pool = sorted(k for k in keys if questions[k[0]].answerable)
-    random.Random(seed).shuffle(pool)
-    return pool[:n]
+    """Answerable (qid, system) pairs, balanced across systems (round-robin over per-system
+    shuffles) so kappa is not dominated by one retriever. Unanswerable questions are scored
+    mechanically (abstained or not), so they need no human label."""
+    rng = random.Random(seed)
+    by_system: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    for k in sorted(k for k in keys if k[0] in questions and questions[k[0]].answerable):
+        by_system[k[1]].append(k)
+    for pool in by_system.values():
+        rng.shuffle(pool)
+    out: list[tuple[str, str]] = []
+    for batch in zip_longest(*(by_system[s] for s in sorted(by_system))):
+        out += [k for k in batch if k is not None]
+    return out[:n]
 
 
 def read_labels(path: Path) -> list[HumanLabel]:
