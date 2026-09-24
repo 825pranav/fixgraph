@@ -251,6 +251,25 @@ def _by_evidence_span(
     return out
 
 
+def _mean_by_type(
+    qmap: dict[str, Question],
+    per: dict[str, dict[str, dict[str, float]]],
+    systems: list[str],
+    metric: str,
+) -> dict[str, dict[str, float]]:
+    """{qtype: {system: mean metric}}, skipping questions where the metric is undefined."""
+    out: dict[str, dict[str, float]] = defaultdict(dict)
+    for s in systems:
+        groups: dict[str, list[float]] = defaultdict(list)
+        for qid, m in per[s].items():
+            v = m.get(metric, math.nan)
+            if not math.isnan(v):
+                groups[qmap[qid].qtype].append(v)
+        for qt, vals in groups.items():
+            out[qt][s] = sum(vals) / len(vals)
+    return dict(out)
+
+
 def _provenance(questions: list[Question]) -> dict[str, int]:
     """How much of the question set a human has verified vs only auto-screened."""
     return {
@@ -323,13 +342,6 @@ def build_report(
     multi_qids = {q.qid for q in questions if len(q.article_ids) > 1}
     subset_tests = _paired_tests(per, systems, baseline, ("correctness", "recall@8"), multi_qids)
 
-    by_type: dict[str, dict[str, float]] = defaultdict(dict)
-    for s in systems:
-        groups: dict[str, list[float]] = defaultdict(list)
-        for qid, m in per[s].items():
-            groups[qmap[qid].qtype].append(m["correctness"])
-        for qt, vals in groups.items():
-            by_type[qt][s] = sum(vals) / len(vals)
     return {
         "n_questions": len(questions),
         "types": dict(Counter(q.qtype for q in questions)),
@@ -338,7 +350,8 @@ def build_report(
         "tests": tests,
         "multi_article_tests": subset_tests,
         "by_evidence_span": _by_evidence_span(questions, per, systems),
-        "correctness_by_type": dict(by_type),
+        "correctness_by_type": _mean_by_type(qmap, per, systems, "correctness"),
+        "recall_by_type": _mean_by_type(qmap, per, [s for s in systems if s != "S0"], "recall@8"),
         "per_question": {s: per[s] for s in systems},
     }
 
@@ -370,14 +383,7 @@ def render_markdown(report: dict[str, Any]) -> str:
     lines.append("|---|" + "---|" * len(systems))
     for c in cols:
         lines.append(f"| {c} | " + " | ".join(cell(s, c) for s in systems) + " |")
-    lines += ["", "Paired permutation tests vs S1 (Holm-corrected):", ""]
-    lines.append("| metric | system | n | diff | p | p (Holm) | d_z |")
-    lines.append("|---|---|---|---|---|---|---|")
-    for t in report["tests"]:
-        lines.append(
-            f"| {t['metric']} | {t['system']} | {t['n']} | {t['diff']:+.3f} | {t['p']:.3f} | "
-            f"{t['p_holm']:.3f} | {t['effect_dz']:+.2f} |"
-        )
+    lines += _tests_table("Paired permutation tests vs S1 (Holm-corrected):", report["tests"])
     prov = report.get("provenance")
     if prov:
         lines.insert(
@@ -391,24 +397,37 @@ def render_markdown(report: dict[str, Any]) -> str:
         lines.append("| evidence | " + " | ".join(systems) + " |")
         lines.append("|---|" + "---|" * len(systems))
         for group, vals in spans.items():
-            if not vals:
-                continue
-            cells = [_span_cell(vals[s]) if s in vals else "—" for s in systems]
-            lines.append(f"| {group} | " + " | ".join(cells) + " |")
+            if vals:
+                cells = [_span_cell(vals[s]) if s in vals else "—" for s in systems]
+                lines.append(f"| {group} | " + " | ".join(cells) + " |")
     if report.get("multi_article_tests"):
-        lines += ["", "Multi-article questions only, vs S1 (Holm-corrected):", ""]
-        lines.append("| metric | system | n | diff | p | p (Holm) | d_z |")
-        lines.append("|---|---|---|---|---|---|---|")
-        for t in report["multi_article_tests"]:
-            lines.append(
-                f"| {t['metric']} | {t['system']} | {t['n']} | {t['diff']:+.3f} | {t['p']:.3f} | "
-                f"{t['p_holm']:.3f} | {t['effect_dz']:+.2f} |"
-            )
-    lines += ["", "Correctness by question type:", ""]
-    lines.append("| type | " + " | ".join(systems) + " |")
-    lines.append("|---|" + "---|" * len(systems))
-    for qt, vals in sorted(report["correctness_by_type"].items()):
-        lines.append(
-            f"| {qt} | " + " | ".join(f"{vals.get(s, float('nan')):.2f}" for s in systems) + " |"
+        lines += _tests_table(
+            "Multi-article questions only, vs S1 (Holm-corrected):", report["multi_article_tests"]
         )
+    for title, key in (("Correctness", "correctness_by_type"), ("Recall@8", "recall_by_type")):
+        by_type = report.get(key, {})
+        if by_type:
+            lines += _by_type_table(f"{title} by question type:", by_type, systems)
     return "\n".join(lines) + "\n"
+
+
+def _tests_table(title: str, tests: list[dict[str, Any]]) -> list[str]:
+    lines = ["", title, "", "| metric | system | n | diff | p | p (Holm) | d_z |"]
+    lines.append("|---|---|---|---|---|---|---|")
+    for t in tests:
+        lines.append(
+            f"| {t['metric']} | {t['system']} | {t['n']} | {t['diff']:+.3f} | {t['p']:.3f} | "
+            f"{t['p_holm']:.3f} | {t['effect_dz']:+.2f} |"
+        )
+    return lines
+
+
+def _by_type_table(
+    title: str, by_type: dict[str, dict[str, float]], systems: list[str]
+) -> list[str]:
+    lines = ["", title, "", "| type | " + " | ".join(systems) + " |"]
+    lines.append("|---|" + "---|" * len(systems))
+    for qt, vals in sorted(by_type.items()):
+        cells = [f"{vals[s]:.2f}" if s in vals else "—" for s in systems]
+        lines.append(f"| {qt} | " + " | ".join(cells) + " |")
+    return lines
