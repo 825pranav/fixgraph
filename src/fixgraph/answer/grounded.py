@@ -4,6 +4,10 @@ The answer model returns JSON: a list of sentences, each with the chunk ids it c
 structured abstention. Citations to chunks that were not in the context are stripped, so an
 answer can never cite evidence it wasn't shown. Every system uses the same model, prompt and
 context token budget; only the retrieved chunks differ.
+
+Used by: bench/run.py (answer stage), api/app.py (`POST /answer`), answer/verifier.py (types).
+Uses: llm.structured.complete_structured for the JSON output; ingest.chunk.count_tokens to
+enforce the context budget.
 """
 
 import time

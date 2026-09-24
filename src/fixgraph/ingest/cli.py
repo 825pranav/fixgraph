@@ -1,4 +1,10 @@
-"""`fixgraph ingest scrape | parse | chunk`."""
+"""`fixgraph ingest scrape | parse | chunk | subset`.
+
+scrape -> data/raw/html (ingest.scrape); parse + select -> articles.parquet (ingest.parse,
+ingest.select); chunk -> chunks.parquet (ingest.chunk); subset trims the corpus to a chunk
+budget. Used by: cli.py (mounted as `ingest`).
+Uses: core.config, core.ontology, ingest.store.
+"""
 
 import json
 import logging

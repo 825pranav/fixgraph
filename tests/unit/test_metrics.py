@@ -1,3 +1,8 @@
+"""Per-question retrieval, citation and abstention metrics on hand-computed cases.
+
+Covers bench/metrics.py.
+"""
+
 import math
 
 from fixgraph.bench.metrics import (

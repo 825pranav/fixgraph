@@ -1,4 +1,9 @@
-"""Build the configured LLMClient (optionally cached)."""
+"""Build the configured LLMClient (optionally cached).
+
+Picks the backend from `settings.llm` (Ollama native, OpenAI-compatible or fake) and wraps it in
+llm.cache. Used by: cli.py (`llm smoke`), the kg and bench CLIs, and api/app.py.
+Uses: core.config.Settings, llm.ollama, llm.openai_compat, llm.fake, llm.cache.
+"""
 
 from fixgraph.core.config import Settings
 from fixgraph.llm.base import LLMClient

@@ -1,3 +1,8 @@
+"""HTML parsing of a fixture article: metadata, sections/units, boilerplate removal.
+
+Covers ingest/parse.py (fixtures in tests/fixtures/html).
+"""
+
 from pathlib import Path
 
 import pytest

@@ -1,4 +1,9 @@
-"""Shared retrieval interface (spec §10). Every system (S0-S5) returns a RetrievalResult."""
+"""Shared retrieval interface (spec §10). Every system (S0-S5) returns a RetrievalResult.
+
+Defines the Retriever protocol, RetrievalResult / Subgraph types and S0 (NoRetrieval,
+closed-book). Implemented by retrieval.hybrid and retrieval.graphrag; consumed by bench.run,
+bench/cli.py and api/app.py. No fixgraph imports.
+"""
 
 from typing import Protocol
 

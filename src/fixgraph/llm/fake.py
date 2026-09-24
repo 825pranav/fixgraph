@@ -1,4 +1,8 @@
-"""Deterministic in-memory LLMClient for tests and the fixture pipeline (no GPU, no network)."""
+"""Deterministic in-memory LLMClient for tests and the fixture pipeline (no GPU, no network).
+
+Selected by llm.factory when the backend is `fake`; api/app.py uses it for fake mode.
+Uses: llm.base.
+"""
 
 from collections.abc import Callable, Iterable
 

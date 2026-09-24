@@ -1,4 +1,9 @@
-"""Corpus data models shared across stages (disk boundary: parquet)."""
+"""Corpus data models shared across stages (disk boundary: parquet).
+
+Article (sections of text units) and Chunk. Produced by ingest.parse / ingest.chunk, persisted by
+ingest.store, and consumed by kg (extraction, run_extract, build, annotate) and retrieval.index.
+No fixgraph imports.
+"""
 
 from typing import Literal
 

@@ -1,3 +1,8 @@
+"""Scraper: sitemap parsing, article ids, robots.txt, caching and User-Agent (mock transport).
+
+Covers ingest/scrape.py.
+"""
+
 from pathlib import Path
 
 import httpx

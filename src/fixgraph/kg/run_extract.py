@@ -2,6 +2,9 @@
 
 Output: one JSON line per chunk in data/extractions/<model>_<prompt_version>.jsonl. Chunks already
 extracted successfully are skipped, so a crash or sleep just resumes; failures are retried.
+
+Used by: `fixgraph kg extract | build | eval` (kg/cli.py); kg.build consumes ExtractionRecord.
+Uses: kg.extraction (prompt/schema), kg.validation.validate, llm.structured, core.ontology.
 """
 
 import json

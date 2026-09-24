@@ -1,4 +1,8 @@
-"""Parquet persistence for articles and chunks."""
+"""Parquet persistence for articles and chunks.
+
+Written by ingest/cli.py; read by the kg and bench CLIs and api/app.py.
+Uses: core.models (Article, ArticleSection, Chunk).
+"""
 
 import json
 from pathlib import Path

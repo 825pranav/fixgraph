@@ -1,3 +1,8 @@
+"""Structured output: schema passed through, one retry with the error appended, then raise.
+
+Covers llm/structured.py (fake LLM).
+"""
+
 import pytest
 from pydantic import BaseModel
 

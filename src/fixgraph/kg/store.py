@@ -1,4 +1,9 @@
-"""Parquet KG storage (spec §7.1): nodes, edges (with provenance), node->chunk mentions."""
+"""Parquet KG storage (spec §7.1): nodes, edges (with provenance), node->chunk mentions.
+
+The on-disk KG contract. Written by kg/cli.py; read by gnn (data, cli), retrieval.graph,
+bench.generate, bench/cli.py and api/app.py; kg.build and kg.quality use the KG type and schemas.
+No fixgraph imports.
+"""
 
 import json
 from dataclasses import dataclass, field

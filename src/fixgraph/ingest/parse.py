@@ -1,4 +1,8 @@
-"""Parse cached support-article HTML into structured `Article`s (spec §6.1)."""
+"""Parse cached support-article HTML into structured `Article`s (spec §6.1).
+
+Used by: `fixgraph ingest parse` (ingest/cli.py) on the HTML cached by ingest.scrape.
+Uses: core.models (Article, sections, text units), core.ontology (product tagging).
+"""
 
 import logging
 import re

@@ -1,4 +1,8 @@
-"""M0 machine check: CUDA-enabled torch must see the GPU (spec §5.3)."""
+"""M0 machine check: CUDA-enabled torch must see the GPU (spec §5.3).
+
+Standalone script run once on a new machine (`python scripts/check_gpu.py`, or the `gpu` poe
+task) before any GPU stage. Uses only torch; imports nothing from fixgraph.
+"""
 
 import sys
 

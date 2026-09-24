@@ -1,3 +1,8 @@
+"""Bootstrap CIs, permutation tests, Holm correction, effect sizes and Cohen's kappa.
+
+Covers bench/stats.py (partly property-based).
+"""
+
 import math
 
 import numpy as np

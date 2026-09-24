@@ -1,4 +1,12 @@
-"""`fixgraph gnn train | gaps` (spec §9)."""
+"""`fixgraph gnn train | gaps` (spec §9).
+
+train: article-held-out split, then cosine / Adamic-Adar / DistMult / GraphSAGE over several
+seeds; writes aggregated filtered-ranking metrics. gaps: trains on all known edges and writes
+top-K predicted Symptom->Fix links (gap_candidates.jsonl, predicted_edges.parquet), which
+api/app.py serves at /links/suggestions.
+Used by: cli.py (mounted as `gnn`).
+Uses: kg.store.read_kg, embeddings, gnn.data, gnn.splits, gnn.models, gnn.evaluate.
+"""
 
 import hashlib
 import json

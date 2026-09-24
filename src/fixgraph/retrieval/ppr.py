@@ -2,6 +2,8 @@
 
 Matches networkx.pagerank(G, alpha=damping, personalization=seeds, weight="weight") semantics:
 dangling nodes redistribute their mass according to the personalization vector.
+
+Used by: retrieval.graphrag (S2). No fixgraph imports.
 """
 
 import numpy as np

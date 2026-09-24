@@ -3,6 +3,9 @@
 The OpenAI-compatible /v1 endpoint ignores `num_ctx` (verified on Ollama 0.34: the model
 loads with a 4096 context), so the default backend uses the native API, which honours
 `num_ctx`, `think` and `keep_alive`. See docs/DECISIONS.md.
+
+Used by: llm.factory (default backend); the kg and bench CLIs also use it directly to unload
+models between stages. Uses: llm.base, httpx.
 """
 
 import time

@@ -1,4 +1,10 @@
-"""Schema-constrained generation: Pydantic model -> JSON Schema -> validated object (spec §5.5)."""
+"""Schema-constrained generation: Pydantic model -> JSON Schema -> validated object (spec §5.5).
+
+`complete_structured` attaches the JSON Schema to the request, validates the reply and retries
+once with the validation error appended. Used by every structured LLM call: kg.run_extract,
+kg.resolve, retrieval.linking, answer.grounded, answer.verifier, bench.judge, bench.generate,
+and `fixgraph llm smoke`. Uses: llm.base.
+"""
 
 import logging
 

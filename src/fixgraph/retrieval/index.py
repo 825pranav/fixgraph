@@ -3,6 +3,10 @@ dense index over KG node names/aliases for entity linking (M4).
 
 Local mode (`QdrantClient(path=...)`) is embedded; no server. Verified to support named dense +
 sparse vectors with the IDF modifier and RRF fusion via prefetch (DECISIONS.md D21).
+
+Used by: `fixgraph index build` (bench/cli.py) to build both collections; retrieval.hybrid and
+retrieval.linking query them; bench/cli.py and api/app.py open the client.
+Uses: core.models.Chunk, embeddings, retrieval.bm25.
 """
 
 import json

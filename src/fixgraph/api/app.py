@@ -5,6 +5,12 @@ Two modes:
   the hybrid index when `data/index/qdrant` exists (models load lazily on first request).
 - fake: `LLM__BACKEND=fake` or no corpus on disk. A two-chunk demo corpus, a lexical retriever
   and a fake LLM that cites its first source, so the container runs with no GPU, data or keys.
+
+Endpoints: /health, /retrieve, /answer, /graph/entity/{id}, /graph/subgraph, /links/suggestions
+(GNN gap candidates, always flagged `predicted`).
+Used by: `fixgraph serve` (cli.py) via `create_app`.
+Uses: answer.grounded, retrieval (hybrid, index, rerank, bm25), kg.store, ingest.store,
+llm.factory, core.config.
 """
 
 import json

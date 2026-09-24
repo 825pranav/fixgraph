@@ -1,5 +1,8 @@
 """Statistics for the benchmark (spec §11.4): bootstrap CIs, paired permutation tests, Holm
-correction, paired effect sizes, Cohen's kappa. Pure numpy, seeded, deterministic."""
+correction, paired effect sizes, Cohen's kappa. Pure numpy, seeded, deterministic.
+
+Used by: bench/run.py (report stage), bench/validate.py (Cohen's kappa for judge agreement).
+"""
 
 from collections.abc import Hashable, Sequence
 

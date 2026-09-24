@@ -6,6 +6,9 @@ endpoints are not grounded in the chunk. Every rejection reason is counted.
 
 `conf` of a kept relation = min(head grounding, tail grounding, evidence score): a
 grounding-based confidence, since small models' self-reported confidences are uninformative.
+
+Used by: kg.run_extract (validates every LLM output); kg.quality and kg.resolve use `normalize`.
+Uses: kg.extraction (ChunkExtraction), kg.schema.relation_allowed.
 """
 
 import re

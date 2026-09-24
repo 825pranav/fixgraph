@@ -9,6 +9,10 @@
 
 The LLM stage runs separately from retrieval (GPU memory rule, spec §5.4): `extract_mentions`
 is called for all questions first, then retrieval consumes the saved mentions.
+
+Used by: bench.run (mentions stage), bench/cli.py (EntityLinker, rule mentions),
+retrieval.graphrag (seeds). Uses: retrieval.index (node collection), embeddings, core.ontology,
+llm.structured.
 """
 
 import math

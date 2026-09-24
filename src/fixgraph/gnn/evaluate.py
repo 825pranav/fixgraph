@@ -1,6 +1,8 @@
 """Filtered ranking metrics (spec §9.4): each held-out (symptom, fix) is ranked against ALL
 Fix nodes after removing the symptom's other known true fixes. Ties count half (expected rank
 under random tie-breaking). AUROC (secondary) compares each positive with one sampled negative.
+
+Used by: gnn/cli.py (`gnn train`) on the score matrices from gnn.models. No fixgraph imports.
 """
 
 from collections import defaultdict

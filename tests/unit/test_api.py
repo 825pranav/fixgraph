@@ -1,3 +1,8 @@
+"""FastAPI endpoints in fake mode: health, retrieve, answer citations, graph and suggestions.
+
+Covers api/app.py (with kg.store for the graph endpoints).
+"""
+
 import json
 from pathlib import Path
 

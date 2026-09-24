@@ -1,4 +1,7 @@
-"""Backend request/response shapes, via httpx.MockTransport (no network)."""
+"""Backend request/response shapes, via httpx.MockTransport (no network).
+
+Covers llm/ollama.py and llm/openai_compat.py, including HTTP error wrapping into LLMError.
+"""
 
 import json
 from typing import Any

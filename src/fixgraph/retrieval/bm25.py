@@ -3,6 +3,9 @@
 Documents store the BM25 term-frequency component tf*(k1+1) / (tf + k1*(1 - b + b*dl/avgdl));
 the IDF factor is applied by Qdrant (`Modifier.IDF`) at query time. Queries are unit weights
 per unique term. Term ids are stable CRC32 hashes, so no vocabulary file is needed.
+
+Used by: retrieval.index (document vectors), retrieval.hybrid (query vectors), retrieval.rerank
+(tokenizer for the lexical fake), api/app.py. No fixgraph imports.
 """
 
 import re

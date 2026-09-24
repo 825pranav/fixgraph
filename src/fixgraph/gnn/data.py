@@ -4,6 +4,9 @@ Node types are KG labels (Article excluded); node features are text embeddings o
 text. Edge types are (src_label, rel.lower(), dst_label) from `origin == "extracted"` edges only.
 The graph is kept directed here; `message_graph` filters target edges and applies ToUndirected,
 so held-out edges can be removed from message passing in both directions.
+
+Used by: gnn/cli.py, gnn.splits (message_graph), gnn.models (TARGET edge type).
+Uses: kg.store.KG, embeddings.Embedder.
 """
 
 from collections import defaultdict

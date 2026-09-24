@@ -1,6 +1,10 @@
 """Text embeddings behind a protocol: Qwen3-Embedding via sentence-transformers, or a fake.
 
 GPU memory rule (spec §5.4): call `release()` when a stage is done with the model.
+
+Used by: kg.resolve / kg.build (entity clustering), gnn.data (node features), retrieval.index,
+retrieval.hybrid and retrieval.linking (dense vectors), and the kg/gnn/bench CLIs and api/app.py.
+Tests use FakeEmbedder. No fixgraph imports.
 """
 
 import gc

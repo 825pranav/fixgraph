@@ -4,6 +4,9 @@ Claims are the answer's sentences (the answer model already writes one fact per 
 The judge model checks each claim against the chunks it cites and labels it supported /
 partial / unsupported. Unsupported claims are dropped; partial ones are kept but flagged.
 Uncited claims are unsupported by definition (no judge call needed).
+
+Used by: bench/run.py (judge stage, feeds the unsupported-claim-rate metric).
+Uses: answer.grounded (GroundedAnswer), llm.structured.complete_structured.
 """
 
 from typing import Literal

@@ -1,3 +1,7 @@
+"""GNN pipeline on a tiny synthetic KG: HeteroData shapes, leakage-free splits, filtered ranking
+metrics, and that every model trains on CPU. Covers gnn/data, splits, models, evaluate.
+"""
+
 import polars as pl
 import pytest
 import torch
