@@ -216,21 +216,22 @@ def report_(
     answers = [R.AnswerRow.model_validate(r) for r in R._read(out / "answers.jsonl")]
     judged = [R.JudgeRow.model_validate(r) for r in R._read(out / "judged.jsonl")]
     report = R.build_report(questions, retrievals, answers, judged)
-    (out / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    stem = "report" if which == "all" else f"report_{which}"  # one file per question filter
+    (out / f"{stem}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     md = R.render_markdown(report)
-    (out / "report.md").write_text(md, encoding="utf-8")
+    (out / f"{stem}.md").write_text(md, encoding="utf-8")
     try:
         import mlflow
 
         mlflow.set_tracking_uri((settings.paths.root.parent / "mlruns").as_uri())
         mlflow.set_experiment("troubleshootqa")
-        with mlflow.start_run(run_name=run_name):
-            mlflow.log_params({"questions": questions_file, "n": len(questions)})
+        with mlflow.start_run(run_name=f"{run_name}-{which}"):
+            mlflow.log_params({"questions": questions_file, "filter": which, "n": len(questions)})
             for system, metrics in report["table"].items():
                 for name, v in metrics.items():
                     if v["mean"] == v["mean"]:  # skip NaN
                         mlflow.log_metric(f"{system}.{name.replace('@', '_at_')}", float(v["mean"]))
-            mlflow.log_artifact(str(out / "report.md"))
+            mlflow.log_artifact(str(out / f"{stem}.md"))
     except Exception as exc:  # MLflow is bookkeeping; never fail the report on it
         logger.warning("MLflow logging skipped: %s", exc)
     typer.echo(md)
@@ -348,6 +349,7 @@ def bench_label(
     questions_file: str = typer.Option("data/bench/dev_handwritten.jsonl"),
     n: int = typer.Option(80, help="Answers to label (spec: 80-100)."),
     labeler: str = typer.Option("developer"),
+    which: str = typer.Option("all", "--questions", help=_WHICH_HELP),
 ) -> None:
     """Blind human labels for judge validation (keys: 1 = correct, 5 = partial, 0 = wrong)."""
     from fixgraph.bench.validate import (
@@ -361,7 +363,7 @@ def bench_label(
 
     settings = load_settings()
     run_dir = settings.paths.results / run_name
-    questions = {q.qid: q for q in read_questions(Path(questions_file))}
+    questions = {q.qid: q for q in _load_questions(questions_file, which, None)}
     answers, judged = load_run(run_dir)
     labels_path = settings.paths.bench / f"judge_labels_{run_name}.jsonl"
     todo = sample_for_labeling(list(answers), questions, n)

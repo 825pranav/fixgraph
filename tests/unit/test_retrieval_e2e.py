@@ -242,4 +242,7 @@ def test_report_end_to_end(tmp_path: Path) -> None:
     assert rep["provenance"] == {"human_verified": 0, "auto_screen_passed": 0, "total": 7}
     md = render_markdown(rep)
     assert "| correctness |" in md and "| multi-article |" in md
+    # Rows for questions outside the set (e.g. rejected in review) are ignored, not a KeyError.
+    subset = build_report(qs[:2], rets, ans, jud)
+    assert subset["table"]["S2"]["correctness"]["n"] == 2
     json.dumps(rep)  # serializable

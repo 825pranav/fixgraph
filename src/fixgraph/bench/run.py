@@ -272,6 +272,8 @@ def build_report(
     a_by = {(a.qid, a.system): a for a in answers}
     per: dict[str, dict[str, dict[str, float]]] = defaultdict(dict)  # system -> qid -> metrics
     for j in judged:
+        if j.qid not in qmap:
+            continue  # row for a question outside this report's set (e.g. rejected in review)
         q = qmap[j.qid]
         per[j.system][j.qid] = per_question_metrics(
             q, r_by.get((j.qid, j.system)), a_by[(j.qid, j.system)], j

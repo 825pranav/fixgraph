@@ -47,10 +47,10 @@ explicit = true
 fmt = { sequence = [{ cmd = "ruff format src tests scripts" }, { cmd = "ruff check --fix src tests scripts" }], help = "Format and autofix" }
 lint = { cmd = "ruff check src tests scripts", help = "Lint" }
 format-check = { cmd = "ruff format --check src tests scripts", help = "Check formatting" }
-types = { cmd = "pyright", help = "Type check" }
-test = { cmd = "pytest tests/unit", help = "Unit tests (no GPU / Ollama / network)" }
+types = { cmd = "python -m pyright", help = "Type check" }
+test = { cmd = "python -m pytest tests/unit", help = "Unit tests (no GPU / Ollama / network)" }
 check = { sequence = ["lint", "format-check", "types", "test"], help = "ruff + pyright + unit tests" }
-test-integration = { cmd = "pytest tests/integration -m integration", help = "Integration tests (needs Ollama running)" }
+test-integration = { cmd = "python -m pytest tests/integration -m integration", help = "Integration tests (needs Ollama running)" }
 gpu = { cmd = "python scripts/check_gpu.py", help = "Verify CUDA torch sees the GPU" }
 
 # --- Tooling -----------------------------------------------------------------
