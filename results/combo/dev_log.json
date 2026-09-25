@@ -1,0 +1,485 @@
+{
+  "route_threshold": 0.987616240978241,
+  "n_dev": 151,
+  "configs": [
+    {
+      "config": "S1",
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 0,
+      "broken": 0,
+      "recovered_broken_by_type": {}
+    },
+    {
+      "config": "prior-d1-l0.05",
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8936,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 1,
+      "broken": 1,
+      "recovered_broken_by_type": {
+        "single_hop": {
+          "recovered": 0,
+          "broken": 1
+        },
+        "bridge": {
+          "recovered": 1,
+          "broken": 0
+        }
+      }
+    },
+    {
+      "config": "prior-d1-l0.05+route",
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8936,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 1,
+      "broken": 0,
+      "recovered_broken_by_type": {
+        "bridge": {
+          "recovered": 1,
+          "broken": 0
+        }
+      }
+    },
+    {
+      "config": "prior-d1-l0.1",
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9255,
+        "answer_hit@8": 0.8936
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 4,
+      "broken": 1,
+      "recovered_broken_by_type": {
+        "single_hop": {
+          "recovered": 0,
+          "broken": 1
+        },
+        "bridge": {
+          "recovered": 4,
+          "broken": 0
+        }
+      }
+    },
+    {
+      "config": "prior-d1-l0.1+route",
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9255,
+        "answer_hit@8": 0.8936
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 4,
+      "broken": 0,
+      "recovered_broken_by_type": {
+        "bridge": {
+          "recovered": 4,
+          "broken": 0
+        }
+      }
+    },
+    {
+      "config": "prior-d1-l0.2",
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9149,
+        "answer_hit@8": 0.8723
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 0.9362,
+        "answer_hit@8": 0.9362
+      },
+      "recovered": 5,
+      "broken": 6,
+      "recovered_broken_by_type": {
+        "single_hop": {
+          "recovered": 0,
+          "broken": 1
+        },
+        "bridge": {
+          "recovered": 5,
+          "broken": 2
+        },
+        "bridge_direct": {
+          "recovered": 0,
+          "broken": 3
+        }
+      }
+    },
+    {
+      "config": "prior-d1-l0.2+route",
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9149,
+        "answer_hit@8": 0.8723
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 5,
+      "broken": 2,
+      "recovered_broken_by_type": {
+        "bridge": {
+          "recovered": 5,
+          "broken": 2
+        }
+      }
+    },
+    {
+      "config": "prior-d3-l0.05",
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8936,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 1,
+      "broken": 1,
+      "recovered_broken_by_type": {
+        "single_hop": {
+          "recovered": 0,
+          "broken": 1
+        },
+        "bridge": {
+          "recovered": 1,
+          "broken": 0
+        }
+      }
+    },
+    {
+      "config": "prior-d3-l0.05+route",
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8936,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 1,
+      "broken": 0,
+      "recovered_broken_by_type": {
+        "bridge": {
+          "recovered": 1,
+          "broken": 0
+        }
+      }
+    },
+    {
+      "config": "prior-d3-l0.1",
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9362,
+        "answer_hit@8": 0.8936
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 5,
+      "broken": 1,
+      "recovered_broken_by_type": {
+        "single_hop": {
+          "recovered": 0,
+          "broken": 1
+        },
+        "bridge": {
+          "recovered": 5,
+          "broken": 0
+        }
+      }
+    },
+    {
+      "config": "prior-d3-l0.1+route",
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9362,
+        "answer_hit@8": 0.8936
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 5,
+      "broken": 0,
+      "recovered_broken_by_type": {
+        "bridge": {
+          "recovered": 5,
+          "broken": 0
+        }
+      }
+    },
+    {
+      "config": "prior-d3-l0.2",
+      "main": {
+        "n": 57,
+        "recall@8": 0.9123,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9468,
+        "answer_hit@8": 0.9149
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 6,
+      "broken": 2,
+      "recovered_broken_by_type": {
+        "single_hop": {
+          "recovered": 0,
+          "broken": 1
+        },
+        "multi_constraint": {
+          "recovered": 0,
+          "broken": 1
+        },
+        "bridge": {
+          "recovered": 6,
+          "broken": 0
+        }
+      }
+    },
+    {
+      "config": "prior-d3-l0.2+route",
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9468,
+        "answer_hit@8": 0.9149
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 6,
+      "broken": 1,
+      "recovered_broken_by_type": {
+        "multi_constraint": {
+          "recovered": 0,
+          "broken": 1
+        },
+        "bridge": {
+          "recovered": 6,
+          "broken": 0
+        }
+      }
+    },
+    {
+      "config": "protected-d1",
+      "main": {
+        "n": 57,
+        "recall@8": 0.8889,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9149,
+        "answer_hit@8": 0.8936
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 4,
+      "broken": 6,
+      "recovered_broken_by_type": {
+        "multi_constraint": {
+          "recovered": 0,
+          "broken": 4
+        },
+        "single_hop": {
+          "recovered": 0,
+          "broken": 1
+        },
+        "bridge": {
+          "recovered": 4,
+          "broken": 1
+        }
+      }
+    },
+    {
+      "config": "protected-d3",
+      "main": {
+        "n": 57,
+        "recall@8": 0.8977,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9043,
+        "answer_hit@8": 0.8936
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 2,
+      "broken": 4,
+      "recovered_broken_by_type": {
+        "multi_constraint": {
+          "recovered": 0,
+          "broken": 3
+        },
+        "single_hop": {
+          "recovered": 0,
+          "broken": 1
+        },
+        "bridge": {
+          "recovered": 2,
+          "broken": 0
+        }
+      }
+    },
+    {
+      "config": "union-d1",
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 0,
+      "broken": 0,
+      "recovered_broken_by_type": {}
+    },
+    {
+      "config": "union-d3",
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 0,
+      "broken": 0,
+      "recovered_broken_by_type": {}
+    }
+  ]
+}

@@ -382,3 +382,64 @@ single-box setup, not a scaled deployment.
   11 pairs for them (b002 b008 b035 b041 b077 b080 b094 b095 b098 b106 b108). The generic list
   was extended with function words and topic words (the same device/app list the answer-leak
   check uses) are ignored. `results/bridge/generation.json` records the final rejections.
+
+## Graph + hybrid combinations (2026-09-25)
+
+### D37: Miss analysis, circularity, split and search grid (written before building)
+Miss analysis (`fixgraph bench miss-analysis`, `results/combo/miss_analysis.json`): S1 misses
+18/171 gold chunks on the 93 main questions and 19/234 on the 156 bridge questions. 13/18 and
+12/19 of the misses are already in S1's top-30 reranker candidates (demoted by the
+cross-encoder); only 5 and 7 are outside it. Verified-KG routes open 200-480 candidate chunks
+per question and carry no usable signal; Apple's article links open about 20 and reach 28%
+(main) / 95% (bridge) of misses from S1's top 3. The edge source for every candidate is
+therefore Apple's human-authored link graph (`data/corpus/links.parquet`), not the
+LLM-extracted KG, and results say so.
+
+Circularity: all 78 bridge pairs were built from an Apple link A -> C (D35), so a link-based
+reranker partly wins bridge questions by construction; no unlinked bridge pairs exist to
+evaluate instead. Bridge results are reported as non-independent and secondary. The primary,
+independent evaluation is the 93 main questions, which were generated from KG paths; 6 of their
+49 multi-article questions happen to have directly linked gold articles.
+
+Split (`fixgraph bench combo-split`, seed 13): each set is split 60/40 into dev/test,
+stratified by question type; bridge pairs (a/d) stay together. The test qids are hash-frozen in
+`results/combo/split.json` before any candidate runs, and no test metric is computed until the
+finalists are recorded (D38).
+
+Candidates (all return exactly 8 chunks; the candidate set is S1's top-30 reranker pool plus the
+chunks of articles Apple-linked from S1's top-d hits; same bge-reranker-v2-m3 cross-encoder):
+- e) link prior: score = CE score + lambda if the chunk is link-reached; lambda in {1, 2, 4}
+  (cross-encoder logit units), d in {1, 3}, routing on/off (on: apply only when S1's top CE
+  score is below the dev median). 12 configs.
+- a) protected expansion: S1's top 6 kept, the 2 remaining slots go to the best-scoring
+  link-reached chunks not already in the top 6 (S1's 7-8 if none), d in {1, 3}. 2 configs.
+- b) union + rerank: pool re-scored by the cross-encoder alone (lambda = 0), d in {1, 3}. 2 configs.
+- d) RRF (S4, D34) and S1 are the references.
+Selection on dev by main-set recall@8 (primary), bridge answer-chunk hit@8 as a tie-breaker;
+at most 2 finalists. Every configuration's dev scores go to `results/combo/dev_log.json`.
+Latency: S1 time plus the measured cross-encoder time for the extra link-reached chunks.
+- Split frozen: main 57 dev / 36 test, bridge 47 / 31 pairs (94 / 62 questions); test qid list
+  SHA-256 `ff8fb961ced277f1e0322750c4df350a6af867b70b906913aa094ae3ccd57bd3` (`results/combo/split.json`). `combo-cache --split test` refuses to run
+  before the finalists are recorded, and `combo-test` refuses a second run.
+- Dev amendment (test split untouched): the cross-encoder returns probabilities in [0, 1] (dev
+  median S1 top score 0.988), not logits, so lambda in {1, 2, 4} promoted every link-reached
+  chunk above every other chunk (identical results for all three; logged in
+  `results/combo/dev_log_grid1_logit_scale.json`). The lambda grid is rescaled to
+  {0.05, 0.1, 0.2}; nothing else changes. Union + rerank (b) equals S1 on dev: no link-only
+  chunk enters the top 8 on cross-encoder score alone.
+
+### D38: Finalists and hypothesis (recorded before the test split was cached or scored)
+Dev (`results/combo/dev_log.json`, 57 main + 94 bridge questions): no configuration beats S1's
+main recall@8 (0.9298); the routed link priors tie it with zero broken hits. Finalists by the
+D37 rule (`results/combo/finalists.json`):
+1. `prior-d3-l0.1+route`: S1's top-30 pool plus chunks of articles Apple-linked to S1's top 3;
+   score = cross-encoder probability + 0.1 for link-reached chunks; applied only when S1's top
+   score < 0.988 (dev median), otherwise S1's ranking unchanged. Dev: main 0.9298 (tie),
+   bridge hit 0.851 -> 0.894, +5 / -0.
+2. `prior-d1-l0.1+route`: the same, expanding from S1's top 1. Dev: main tie, bridge 0.894,
+   +4 / -0.
+Hypotheses for the single test run (36 main, 62 bridge questions): (H1, primary, independent)
+the finalists do not lower main recall@8 (no significant difference vs S1, broken hits <= 1);
+a main-set gain is not expected (dev shows none). (H2, secondary, non-independent) the finalists
+raise bridge answer-chunk hit@8 over S1. Reported with n, bootstrap CIs, Holm-corrected paired
+permutation tests, recovered/broken per question type and extra latency. No tuning afterwards.

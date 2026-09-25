@@ -10,6 +10,7 @@ import typer
 from tqdm import tqdm
 
 from fixgraph.bench import run as R
+from fixgraph.bench.combo import CacheRow
 from fixgraph.bench.judge import JudgeExample, JudgeVariant
 from fixgraph.bench.schema import Question, QuestionFilter, read_questions, select_questions
 from fixgraph.core.config import Settings, load_settings
@@ -720,3 +721,190 @@ def bridge_import(
         encoding="utf-8",
     )
     typer.echo(f"{sum(r.ok for r in results)}/{len(cands)} pairs passed -> {out_file}")
+
+
+# --- graph + hybrid combinations (D37+) ---------------------------------------------------------
+
+
+@app.command("miss-analysis")
+def miss_analysis_cmd(
+    kg_dir: str = typer.Option("data/kg_verified"),
+    out: str = typer.Option("results/combo/miss_analysis.json"),
+) -> None:
+    """Where S1 misses gold chunks, and which graph routes could reach them (D37 ceiling)."""
+    from fixgraph.bench.miss import Expander, miss_analysis
+    from fixgraph.ingest.links import read_links
+    from fixgraph.kg.store import read_kg
+    from fixgraph.retrieval.graph import build_graph_index
+
+    settings = load_settings()
+    paths = settings.paths
+    graph = build_graph_index(read_kg(Path(kg_dir)))
+    links = [(x.src_article, x.dst_article) for x in read_links(paths.corpus / "links.parquet")]
+    exp = Expander(graph, links, [c.chunk_id for c in read_chunks(paths.chunks)])
+    report: dict[str, object] = {"kg_dir": kg_dir}
+    for name, qfile, run in (
+        ("main93", "data/bench/generated.jsonl", "test_verified"),
+        ("bridge156", _BRIDGE_FILE, "bridge"),
+    ):
+        qs = [q for q in read_questions(Path(qfile)) if q.verified]
+        ranked = {
+            r["qid"]: r["result"]["chunk_ids"]
+            for r in R._read(paths.results / run / "retrieval.jsonl")
+            if r["system"] == "S1"
+        }
+        report[name] = miss_analysis(qs, ranked, exp)
+    Path(out).parent.mkdir(parents=True, exist_ok=True)
+    Path(out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    for name in ("main93", "bridge156"):
+        r = report[name]
+        assert isinstance(r, dict)
+        typer.echo(f"{name}: {r['n_missed_chunks']}/{r['n_gold_chunks']} gold chunks missed")
+        for depth in ("expand_from_top3", "expand_from_top8"):
+            routes = r[depth]["routes"]
+            typer.echo(f"  {depth}: " + ", ".join(
+                f"{k}={v['share']} (pool {v.get('median_pool_chunks', '-')})"
+                for k, v in routes.items()))  # fmt: skip
+
+
+_COMBO = Path("results/combo")
+_COMBO_SETS = (("data/bench/generated.jsonl", "main"), (_BRIDGE_FILE, "bridge"))
+
+
+def _combo_questions(split: str | None = None) -> list[Question]:
+    qs = [q for f, _ in _COMBO_SETS for q in read_questions(Path(f)) if q.verified]
+    if split is None:
+        return qs
+    assignment = json.loads((_COMBO / "split.json").read_text(encoding="utf-8"))["assignment"]
+    return [q for q in qs if assignment[q.qid] == split]
+
+
+@app.command("combo-split")
+def combo_split(seed: int = typer.Option(13)) -> None:
+    """Seeded 60/40 dev/test split of the 93 main + 156 bridge questions; hash-freezes test."""
+    import hashlib
+
+    from fixgraph.bench.combo import split_questions
+
+    target = _COMBO / "split.json"
+    if target.exists():
+        raise typer.BadParameter(f"{target} exists; the split is fixed once (D37)")
+    qs = _combo_questions()
+    assignment = split_questions(qs, seed=seed)
+    test_ids = sorted(q for q, s in assignment.items() if s == "test")
+    counts: dict[str, dict[str, int]] = {}
+    for q in qs:
+        counts.setdefault(q.qtype, {"dev": 0, "test": 0})[assignment[q.qid]] += 1
+    _COMBO.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        json.dumps(
+            {
+                "seed": seed,
+                "test_sha256": hashlib.sha256("\n".join(test_ids).encode()).hexdigest(),
+                "counts": counts,
+                "assignment": dict(sorted(assignment.items())),
+            },
+            indent=1,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    typer.echo(json.dumps(counts))
+
+
+@app.command("combo-cache")
+def combo_cache(split: str = typer.Option(..., help="dev | test")) -> None:
+    """One GPU pass: fused candidates, cross-encoder scores for S1's pool and the Apple-link
+    pool, and timings, cached for the split's questions."""
+    from fixgraph.bench.combo import build_cache
+    from fixgraph.embeddings import SentenceTransformerEmbedder
+    from fixgraph.ingest.links import read_links
+    from fixgraph.retrieval.hybrid import HybridRetriever
+    from fixgraph.retrieval.index import load_bm25, open_client
+    from fixgraph.retrieval.rerank import CrossEncoderReranker
+
+    if split == "test" and not (_COMBO / "finalists.json").exists():
+        raise typer.BadParameter("record the finalists (D38) before touching the test split")
+    settings = load_settings()
+    paths = settings.paths
+    docs, _ = _chunk_docs(settings)
+    links = [(x.src_article, x.dst_article) for x in read_links(paths.corpus / "links.parquet")]
+    embedder, reranker = SentenceTransformerEmbedder(), CrossEncoderReranker()
+    client = open_client(paths.index)
+    try:
+        hybrid = HybridRetriever(client, embedder, load_bm25(paths.index), reranker, docs)
+        rows = build_cache(_combo_questions(split), hybrid, docs, links, list(docs))
+    finally:
+        client.close()
+        reranker.release()
+        embedder.release()
+    out = paths.results / "combo" / f"cache_{split}.jsonl"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("".join(r.model_dump_json() + "\n" for r in rows), encoding="utf-8")
+    typer.echo(f"{len(rows)} questions cached -> {out}")
+
+
+def _combo_rows(split: str) -> dict[str, CacheRow]:
+    path = load_settings().paths.results / "combo" / f"cache_{split}.jsonl"
+    rows = [CacheRow.model_validate_json(x) for x in path.read_text(encoding="utf-8").splitlines()]
+    return {r.qid: r for r in rows}
+
+
+@app.command("combo-dev")
+def combo_dev() -> None:
+    """Score S1 and every D37 grid config on the dev split; log all of them."""
+    from statistics import median
+
+    from fixgraph.bench.combo import Config, grid, per_question, rank, recovered_broken, summarize
+
+    qs = _combo_questions("dev")
+    rows = _combo_rows("dev")
+    threshold = median(rows[q.qid].ce[rows[q.qid].s1[0]] for q in qs)
+    s1 = {q.qid: rank(rows[q.qid], Config(kind="s1"), threshold) for q in qs}
+    log = []
+    for cfg in [Config(kind="s1"), *grid()]:
+        r = {q.qid: rank(rows[q.qid], cfg, threshold) for q in qs}
+        per = per_question(qs, r)
+        rb = recovered_broken(qs, s1, r)
+        log.append({
+            "config": cfg.name,
+            **{sub: summarize(qs, per, sub) for sub in ("main", "bridge", "bridge_direct")},
+            "recovered": sum(v["recovered"] for v in rb.values()),
+            "broken": sum(v["broken"] for v in rb.values()),
+            "recovered_broken_by_type": rb,
+        })  # fmt: skip
+    (_COMBO / "dev_log.json").write_text(
+        json.dumps({"route_threshold": threshold, "n_dev": len(qs), "configs": log}, indent=2)
+        + "\n",
+        encoding="utf-8",
+    )
+    typer.echo(f"route threshold (dev median S1 top score) = {threshold:.3f}")
+    for e in log:
+        typer.echo(
+            f"{e['config']:<22} main r@8 {e['main']['recall@8']}"
+            f"  bridge hit {e['bridge']['answer_hit@8']}"
+            f"  direct hit {e['bridge_direct']['answer_hit@8']}  +{e['recovered']}/-{e['broken']}"
+        )
+
+
+@app.command("combo-test")
+def combo_test(out: str = typer.Option("results/combo/test_report.json")) -> None:
+    """The single locked-test run of S1 vs the recorded finalists (D38). Refuses to rerun."""
+    import hashlib
+
+    from fixgraph.bench.combo import Config, test_report
+
+    if Path(out).exists():
+        raise typer.BadParameter(f"{out} exists; the test split is evaluated once (D38)")
+    fin = json.loads((_COMBO / "finalists.json").read_text(encoding="utf-8"))
+    split = json.loads((_COMBO / "split.json").read_text(encoding="utf-8"))
+    qs = _combo_questions("test")
+    ids = "\n".join(sorted(q.qid for q in qs)).encode()
+    if hashlib.sha256(ids).hexdigest() != split["test_sha256"]:
+        raise typer.BadParameter("test questions do not match the frozen split hash")
+    report = test_report(qs, _combo_rows("test"), [Config(**c) for c in fin["finalists"]],
+                         fin["route_threshold"])  # fmt: skip
+    report["finalists"] = fin
+    Path(out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    typer.echo(json.dumps({k: report[k] for k in ("table", "tests_vs_S1", "recovered_broken",
+                                                   "latency_s")}, indent=1))  # fmt: skip
