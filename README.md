@@ -17,6 +17,10 @@ Docker image.
 - **0.89 recall@8 on a hash-frozen held-out split, 0.46 s per query.** The hybrid retriever
   (dense + BM25 + cross-encoder) finds the answer chunk for **100%** of direct questions and
   **83%** of multi-hop questions whose answer lives in a different, unnamed article.
+- **Reranker ensemble for recall**: blending Qwen3-Reranker-0.6B with bge-reranker-v2-m3 raised
+  held-out recall@8 from 0.919 to 0.937 (98 questions; main split 0.891 → 0.912) with no lost
+  gold chunks, at 1.6 s instead of 0.58 s per query; not significant at this n (p_Holm = 0.25),
+  so it ships as an option and S1 stays the default.
 - **Knowledge graph from a 4B local model**: 2,201 nodes and 2,926 edges, every edge traceable
   to its source chunk, plus a source-grounded verification stage that checks each edge against
   the text it came from.
@@ -35,7 +39,11 @@ Docker image.
    combination matched it on held-out data.
 2. **The remaining headroom is in reranking.** A miss analysis traced 68% of the retriever's
    residual misses to chunks it had already retrieved but the cross-encoder ranked just outside
-   the top 8, which points the next improvement at the reranker rather than the index.
+   the top 8, which points the next improvement at the reranker rather than the index. A
+   follow-up reranking study (61 dev configurations, one locked test run) found that a second
+   cross-encoder recovers some of them (+0.018 held-out recall@8, not significant, 2.8x
+   latency), while larger candidate pools, fine-tuning on synthetic queries and LLM query
+   decomposition did not help.
 3. **LLM-extracted graphs need grounding.** An audit of a blind, stratified edge sample
    estimated 31% of edges extracted by the 4B model were not stated by their source text, with
    causal and cross-device relations the weakest; source-grounded verification brings that to
@@ -56,6 +64,9 @@ paired permutation tests, Holm-corrected.
 | Graph retrievers on multi-hop (PPR / PPR + article links / typed paths) | 0.42 / 0.41 / 0.27 | 78 | same |
 | Graph + hybrid combination, held-out split | matches hybrid (0.891); +0.065 answer-chunk hit@8 on bridge questions * | 36 / 31 | [`results/combo/test_report.json`](results/combo/test_report.json) |
 | Retrieval latency per query | 0.46 s (+0.05 s with graph reranking) | 98 | same |
+| Reranker blend (Qwen3-Reranker + bge) vs S1, held-out split, recall@8 | **0.937** vs 0.919 (+4 / −0 gold chunks, p_Holm = 0.25) | 98 | [`results/rerank/test_report.json`](results/rerank/test_report.json) |
+| same, main questions only | **0.912** vs 0.891 | 36 | same |
+| Retrieval latency p50, S1 / blend (re-measured) | 0.58 s / 1.64 s | 98 | [`results/rerank/latency_test.json`](results/rerank/latency_test.json) |
 
 \* Directional (p_Holm = 0.99), and bridge questions share the link source with the reranker.
 
@@ -312,6 +323,58 @@ no regressions; on bridge questions it answers 2 more of 31 (directional, and sh
 source). Hybrid retrieval with a cross-encoder is the strongest retriever measured here, and the
 miss analysis shows its remaining headroom is in reranking.
 
+### Reranking study on the locked split (2026-09-26)
+
+> The miss analysis above put the remaining headroom in the reranker, so this round changes only
+> S1's last stage. Protocols D39-D42 in [`docs/DECISIONS.md`](docs/DECISIONS.md) were written
+> before the runs; the D37 dev/test split and its test hash are unchanged. No link or graph
+> signal is used, so bridge questions count as an independent benchmark here.
+
+**Dev search** (`results/rerank/dev_log.json`, 151 dev questions, 61 configurations): two
+rerankers (bge-reranker-v2-m3 at 512 / 1024 tokens; Qwen3-Reranker-0.6B with its default and a
+troubleshooting instruction), candidate pools of 30 / 50 / 100, fusion with the first-stage
+(dense + BM25 RRF) score, and bge + Qwen blends.
+
+| dev (151 questions) | recall@8 | est. latency |
+|---|---|---|
+| S1 (bge, top 30) | 0.937 | 0.60 s |
+| bge, top 50 / top 100 | 0.934 / 0.934 | 0.93 / 1.64 s |
+| Qwen3-Reranker alone (troubleshooting instruction) | 0.937 | 1.58 s |
+| bge + 0.1 x first-stage score | 0.946 | 0.60 s |
+| **Qwen3-Reranker + bge, 50/50 blend** (rule's pick) | **0.947** | 2.00 s |
+| bge fine-tuned on 600 out-of-corpus synthetic queries (D40) | 0.934 | 0.60 s |
+| LLM query decomposition, best merge (D42, `decomp_dev_log.json`) | 0.939 | 1.6 s incl. LLM |
+
+**Locked test** (`results/rerank/test_report.json`, one run; 36 main + 62 bridge questions;
+latency from `results/rerank/latency_test.json`):
+
+| | n | S1 | Qwen3 + bge blend | bge + first-stage score |
+|---|---|---|---|---|
+| recall@8, all | 98 | 0.919 [0.88, 0.95] | **0.937** [0.90, 0.97] | 0.924 [0.89, 0.96] |
+| recall@8, main | 36 | 0.891 [0.83, 0.95] | **0.912** [0.85, 0.97] | 0.905 [0.84, 0.96] |
+| recall@8, bridge | 31 | 0.871 | **0.903** | 0.871 |
+| answer-chunk hit@8, bridge / direct | 31 / 31 | 0.806 / 1.00 | **0.839** / 1.00 | 0.806 / 1.00 |
+| recovered / broken gold chunks vs S1 | | | +4 / −0 | +1 / −0 |
+| p_Holm vs S1 (recall@8, all) | | | 0.25 | 1.0 |
+| retrieval latency p50 / p95 | 98 | 0.58 / 0.62 s | 1.64 / 1.83 s | 0.57 / 0.61 s |
+
+**Result.** Blending Qwen3-Reranker-0.6B with bge raised held-out recall@8 from 0.919 to 0.937
+(main questions 0.891 to 0.912) and recovered 4 gold chunks without losing any, but the gain
+is not significant at n = 98 (p_Holm = 0.25) and it costs about 2.8x the retrieval latency
+(two cross-encoders). Adding the first-stage score to bge is free but recovers one chunk.
+Larger candidate pools, 1024-token inputs, fine-tuning bge on synthetic queries and LLM query
+decomposition did not beat S1 on dev. S1 stays the default; the blend is available as a
+configuration for when recall matters more than latency.
+
+*Measurement notes.* The locked run scored Qwen3-Reranker in batches of 16 and its p95
+latency was 13.3 s: in a first timing run 6 of 98 queries took 13-18 s, most likely because a
+batch padded
+to 1024 tokens overflowed the 6 GB of VRAM into the driver's system-memory fallback. The
+retriever now uses batches of 4 for Qwen3-Reranker; a second timing-only run (the latency row
+above) returned the same top 8 for 97 of 98 questions (the other keeps both of its gold
+chunks), so the recall figures are unaffected. S1's 0.58 s here versus 0.46 s in
+earlier rounds is the same code measured on a different day.
+
 ### Knowledge graph
 
 qwen3:4b, prompt v2, 500 chunks, 4.9 s/chunk wall-clock (2 concurrent requests, ~9 s each),
@@ -362,10 +425,11 @@ documented in a different article.
 | M5 benchmark: generation, review, bridge set, locked split | done: 93 reviewed + 78 frozen bridge pairs; held-out combination test (D37–D38); judge κ = 0.38, recalibration coded (D33), not run |
 | M6 GNN: baselines, hetero-SAGE, gap report | done (S4 routing not run) |
 | M7 FastAPI, Docker (CI-built), write-up | done |
+| Reranking study (D39–D42): reranker choice, pools, fusion, fine-tuning, decomposition | done: one locked test run; blend is an opt-in serving config |
 
 Next steps: run the judge calibration (D33; about 1–2 h GPU) and re-judge; a human pass over a
-sample of questions and judge labels; study why the cross-encoder demotes 25 of the hybrid
-retriever's 37 residual misses (the only headroom left); scale to the full 2,531-chunk corpus.
+sample of questions and judge labels; a larger held-out set to tell whether the reranker blend's
++0.018 recall@8 is real (n = 98 cannot); scale to the full 2,531-chunk corpus.
 
 ## Repository layout
 
@@ -375,10 +439,11 @@ src/fixgraph/
   llm/         LLMClient protocol: Ollama native, OpenAI-compatible, fake; SQLite cache
   ingest/      scraper, parser, chunker, corpus selection
   kg/          extraction schema + prompt, validation, resolution, parquet store, quality eval
-  retrieval/   BM25, Qdrant index, hybrid RAG, entity linking, PPR, typed paths
+  retrieval/   BM25, Qdrant index, hybrid RAG, rerankers (+ blends, fine-tuning, query
+               decomposition), entity linking, PPR, typed paths
   answer/      grounded generation, claim verifier
   bench/       questions, path-based generation, auto-screen, human verification, runner,
-               judge, metrics, statistics, judge validation
+               judge, metrics, statistics, judge validation, combination and reranking studies
   gnn/         HeteroData export, splits, baselines, hetero GraphSAGE, evaluation
   api/         FastAPI service
 configs/       base.yaml, ontology.yaml
@@ -497,6 +562,22 @@ uv run fixgraph bench generate        # 191 questions from KG paths (qwen3:8b)
 uv run fixgraph bench screen          # automatic pre-screen, advisory only
 uv run fixgraph bench run --questions-file data/bench/generated.jsonl --run-name test
 ```
+
+Reranking study (D39-D42, ~1 h on the RTX 4050; uses the frozen D37 split):
+
+```powershell
+uv run fixgraph bench rr-cache --split dev    # top-100 candidates + every reranker's scores
+uv run fixgraph bench ft-synth; uv run fixgraph bench ft-train --base bge --out-name bge-ft
+uv run fixgraph bench rr-cache --split dev --scorers bgeft
+uv run fixgraph bench rr-dev --scorers bge,bge1024,qwen,qwents,bgeft
+uv run fixgraph bench rr-decomp               # LLM query decomposition, dev only
+uv run fixgraph bench rr-select               # records the finalists (once)
+uv run fixgraph bench rr-test                 # the single locked-test run
+uv run fixgraph bench rr-latency              # timing-only rerun
+```
+
+Serve the recall-oriented blend with `RETRIEVAL__SECOND_RERANKER=qwen` and
+`RETRIEVAL__SECOND_WEIGHT=0.5` (or the `retrieval` section of `configs/base.yaml`).
 
 See `DATA.md` for data provenance and `docs/DECISIONS.md` for every design decision.
 

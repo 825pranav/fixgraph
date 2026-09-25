@@ -443,3 +443,97 @@ the finalists do not lower main recall@8 (no significant difference vs S1, broke
 a main-set gain is not expected (dev shows none). (H2, secondary, non-independent) the finalists
 raise bridge answer-chunk hit@8 over S1. Reported with n, bootstrap CIs, Holm-corrected paired
 permutation tests, recovered/broken per question type and extra latency. No tuning afterwards.
+
+## Reranking study (2026-09-26)
+
+### D39: Reranker, pool size and score fusion (protocol written before any run)
+D37 found 13 of S1's 18 misses on the main set already inside its top-30 cross-encoder pool, so
+this study changes only the last stage of S1. It reuses the frozen D37 split (dev 57 main + 94
+bridge questions; test 36 main + 62 bridge, SHA-256 unchanged). Link-based methods are not part
+of this study, so bridge questions are an independent retrieval benchmark here and are pooled
+with the main questions for selection.
+- Cache (`fixgraph bench rr-cache`): the top 100 dense + BM25 RRF candidates per question and,
+  for every reranker, its score for each of them, timed per pool slice (0-30, 30-50, 50-100).
+- Rerankers (`retrieval/rerank.py: RERANKERS`): `bge` (bge-reranker-v2-m3, 512 tokens, the
+  current S1), `bge1024` (same model, 1024 tokens; 21 of 500 chunks exceed ~480 document
+  tokens), `qwen` (Qwen3-Reranker-0.6B, 1024 tokens, its default instruction) and `qwents` (the
+  same model with a troubleshooting instruction written once, before any run).
+- Grid (`bench/rerank_study.py: grid`): each reranker at pool 30 / 50 / 100; each reranker at
+  pool 30 / 50 plus alpha x (first-stage RRF score), alpha in {0.1, 0.25, 0.5}; each non-bge
+  reranker blended with bge at pool 30 / 50, weight w2 in {0.25, 0.5} on bge. Scores are
+  z-normalised within the pool before any blend.
+- Selection rule: the highest mean recall@8 over all 151 dev questions; ties go to the lower
+  mean latency; S1 (`bge@30`) is kept unless a configuration strictly beats it. Main recall@8,
+  bridge answer-chunk hit@8 and recovered / broken gold chunks vs S1 are logged for every
+  configuration in `results/rerank/dev_log.json`.
+- Test: the selected configuration is run once on the test split through the real retriever
+  (live timing), with S1 alongside; recall@8, answer-chunk hit@8, bootstrap CIs, a paired
+  permutation test and p50 / p95 latency go to `results/rerank/test_report.json`. `rr-cache
+  --split test` refuses to run before `results/rerank/selected.json` exists. No tuning
+  afterwards; a loss or a tie is reported as such.
+
+### D40: Fine-tuning the reranker on out-of-corpus synthetic queries (written before training)
+The dev grid (D39) showed the remaining misses are gold chunks the cross-encoder ranks 8-15,
+so the next step adapts the cross-encoder itself to the domain. No benchmark data is used for
+training:
+- Source chunks: the scraped articles that are not in the 500-chunk working set
+  (`chunks_full.parquet` minus `chunks.parquet`; 2,031 chunks). No benchmark question, gold chunk
+  or working-set article is seen by generation or training.
+- `fixgraph bench ft-synth`: a seeded sample of 600 chunks (at most 2 per article, >= 40
+  tokens); qwen3:4b writes one troubleshooting question per chunk that the chunk answers,
+  describing the symptom without copying the title or naming the fix. Hard negatives: the
+  Qwen3-Embedding top matches from other articles in the same out-of-corpus pool, skipping the
+  2 closest (likely unlabelled positives), 7 per question.
+- `fixgraph bench ft-train`: listwise softmax cross-entropy over (positive + 7 negatives), only
+  the last 4 transformer layers and the head trainable, AdamW lr 2e-5, 1 epoch, gradient
+  accumulation 4, bf16 autocast, seed 13. One setting, fixed now; not tuned on dev.
+- The fine-tuned model enters the D39 dev grid as scorer `bgeft` (base: bge-reranker-v2-m3,
+  the S1 reranker, so any gain costs no latency) under the same selection rule.
+
+### D42: Query decomposition (written before the run)
+Most remaining main-set misses are multi_constraint questions that name two problems, where
+the gold chunk for the second problem sits at cross-encoder rank 8-15. `fixgraph bench
+rr-decomp` asks qwen3:4b (think off, temperature 0) to split each dev question into one
+self-contained search per problem (the original question is kept when it names one problem).
+Every query gets its own top-30 fused candidates and bge cross-encoder scores; three merges are
+compared with S1 (`retrieval/decompose.py`): `orig` (union of the pools, reranked against the
+original question), `max` (best cross-encoder probability over the queries) and `rr`
+(round-robin over the per-query lists, original first). Latency includes the LLM call.
+Results go to `results/rerank/decomp_dev_log.json`. A merge becomes a finalist only if it
+beats S1 on all-dev recall@8 (D39 rule), and its latency is reported as a trade-off.
+
+### D41: Finalists for the single test run (written after dev, before any test retrieval)
+Dev outcome (`results/rerank/dev_log.json`, 151 questions): the D39 rule picks
+`qwen@30+bgex0.5` (Qwen3-Reranker and bge blended 50/50), but its estimated latency is about
+3.3x S1's for a margin of one gold chunk over the best configuration that costs no extra time,
+`bge@30+rrf0.1` (S1's cross-encoder score plus 0.1 x the first-stage RRF score, both
+z-normalised). Amendment, made before the test split was touched: both go to the test run, the
+rule's pick and the best configuration within 10% of S1's latency
+(`rerank_study.select_finalists`), with Holm correction over the two comparisons with S1.
+Not finalists, recorded as dev results:
+- Fine-tuned bge (D40, `bgeft`): 0.934 all-dev recall@8 vs 0.937 for S1; it did not help.
+- Query decomposition (D42, `results/rerank/decomp_dev_log.json`): the `max` merge raised main
+  recall@8 on dev but lowered bridge recall and adds an LLM call; its all-dev recall@8 is
+  below `bge@30+rrf0.1`'s, so it does not enter the test run.
+- Larger pools (50, 100), 1024-token bge, and capping chunks per article (explored after the
+  grid, dev only) did not raise dev recall@8.
+- Test-run note: the first `rr-test` attempt loaded all three systems' models at once; VRAM
+  (6 GB) overflowed into the driver's system-memory fallback and retrieval slowed to ~12 s per
+  question for the three systems. It was stopped about a third of the way in, before any metric
+  was computed or printed, and `rr-test` now runs one system at a time with only its own
+  rerankers loaded. Nothing else changed.
+
+### D43: Reranking study results (after the single test run)
+Locked test (`results/rerank/test_report.json`, 36 main + 62 bridge questions):
+- `qwen@30+bgex0.5` vs S1: recall@8 0.937 vs 0.919 over all 98 (+0.018, p = 0.12, p_Holm =
+  0.25), 0.912 vs 0.891 on the 36 main questions, bridge answer-chunk hit@8 0.839 vs 0.806;
+  +4 / -0 gold chunks (2 multi_constraint, 2 bridge).
+- `bge@30+rrf0.1` vs S1: 0.924 vs 0.919 (+1 / -0), p_Holm = 1.0.
+- Neither is significant at this n. The blend is directional evidence that a second
+  cross-encoder recovers chunks bge demotes, at about 2.8x S1's retrieval latency (p50 1.64 s vs
+  0.58 s, `results/rerank/latency_test.json`). S1 stays the default; the blend is exposed as a
+  serving option (`retrieval` settings), not promoted.
+- Latency measurement: the locked run's Qwen3-Reranker batches of 16 produced 13-18 s outliers
+  (VRAM overflow into system memory); Qwen3-Reranker now runs in batches of 4, and the
+  timing-only rerun reproduced the locked top 8 for 97/98 questions (the remaining one keeps
+  both gold chunks).

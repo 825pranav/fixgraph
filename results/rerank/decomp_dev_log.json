@@ -1,0 +1,104 @@
+{
+  "n_dev": 151,
+  "n_decomposed": 50,
+  "model": "qwen3:4b",
+  "pool": 30,
+  "merges": [
+    {
+      "merge": "s1",
+      "all": {
+        "n": 151,
+        "recall@8": 0.9371
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298
+      },
+      "multi_constraint": {
+        "n": 26,
+        "recall@8": 0.8846
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0
+      },
+      "latency_s_mean": 1.6315
+    },
+    {
+      "merge": "orig",
+      "all": {
+        "n": 151,
+        "recall@8": 0.9338
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298
+      },
+      "multi_constraint": {
+        "n": 26,
+        "recall@8": 0.8846
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8723
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0
+      },
+      "latency_s_mean": 1.6315
+    },
+    {
+      "merge": "max",
+      "all": {
+        "n": 151,
+        "recall@8": 0.9393
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9444
+      },
+      "multi_constraint": {
+        "n": 26,
+        "recall@8": 0.9167
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8723
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0
+      },
+      "latency_s_mean": 1.6315
+    },
+    {
+      "merge": "rr",
+      "all": {
+        "n": 151,
+        "recall@8": 0.936
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9444
+      },
+      "multi_constraint": {
+        "n": 26,
+        "recall@8": 0.9167
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8617
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0
+      },
+      "latency_s_mean": 1.6315
+    }
+  ]
+}

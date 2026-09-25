@@ -1,0 +1,10 @@
+{
+ "base": "bge",
+ "n_groups": 600,
+ "train_layers": 4,
+ "epochs": 1,
+ "lr": 2e-05,
+ "loss_per_epoch": [
+  0.0976
+ ]
+}

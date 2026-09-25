@@ -1,0 +1,2203 @@
+{
+  "n_dev": 151,
+  "baseline": "bge@30",
+  "selected": "qwen@30+bgex0.5",
+  "configs": [
+    {
+      "config": "bge@30",
+      "spec": {
+        "scorer": "bge",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9371,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 0,
+      "broken": 0,
+      "latency_s": {
+        "mean": 0.5996,
+        "p95": 0.6401
+      }
+    },
+    {
+      "config": "bge@50",
+      "spec": {
+        "scorer": "bge",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9338,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8723,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 0,
+      "broken": 1,
+      "latency_s": {
+        "mean": 0.9313,
+        "p95": 0.985
+      }
+    },
+    {
+      "config": "bge@100",
+      "spec": {
+        "scorer": "bge",
+        "pool": 100,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9338,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8723,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 0,
+      "broken": 1,
+      "latency_s": {
+        "mean": 1.6357,
+        "p95": 1.72
+      }
+    },
+    {
+      "config": "bge1024@30",
+      "spec": {
+        "scorer": "bge1024",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9338,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 0,
+      "broken": 1,
+      "latency_s": {
+        "mean": 0.6345,
+        "p95": 0.7011
+      }
+    },
+    {
+      "config": "bge1024@50",
+      "spec": {
+        "scorer": "bge1024",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9305,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8723,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 0,
+      "broken": 2,
+      "latency_s": {
+        "mean": 0.9887,
+        "p95": 1.0973
+      }
+    },
+    {
+      "config": "bge1024@100",
+      "spec": {
+        "scorer": "bge1024",
+        "pool": 100,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9305,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8723,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 0,
+      "broken": 2,
+      "latency_s": {
+        "mean": 1.7396,
+        "p95": 1.9025
+      }
+    },
+    {
+      "config": "qwen@30",
+      "spec": {
+        "scorer": "qwen",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.936,
+        "answer_hit@8": 0.9362
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9094,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9043,
+        "answer_hit@8": 0.8723
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 8,
+      "broken": 8,
+      "latency_s": {
+        "mean": 1.5583,
+        "p95": 1.7714
+      }
+    },
+    {
+      "config": "qwen@50",
+      "spec": {
+        "scorer": "qwen",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.936,
+        "answer_hit@8": 0.9362
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9094,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9043,
+        "answer_hit@8": 0.8723
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 8,
+      "broken": 8,
+      "latency_s": {
+        "mean": 2.5865,
+        "p95": 2.914
+      }
+    },
+    {
+      "config": "qwen@100",
+      "spec": {
+        "scorer": "qwen",
+        "pool": 100,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.936,
+        "answer_hit@8": 0.9362
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9094,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9043,
+        "answer_hit@8": 0.8723
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 8,
+      "broken": 8,
+      "latency_s": {
+        "mean": 4.8444,
+        "p95": 5.46
+      }
+    },
+    {
+      "config": "qwents@30",
+      "spec": {
+        "scorer": "qwents",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9371,
+        "answer_hit@8": 0.9574
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.9149
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 9,
+      "broken": 9,
+      "latency_s": {
+        "mean": 1.5768,
+        "p95": 1.8152
+      }
+    },
+    {
+      "config": "qwents@50",
+      "spec": {
+        "scorer": "qwents",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9371,
+        "answer_hit@8": 0.9574
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.9149
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 9,
+      "broken": 9,
+      "latency_s": {
+        "mean": 2.5996,
+        "p95": 2.9186
+      }
+    },
+    {
+      "config": "qwents@100",
+      "spec": {
+        "scorer": "qwents",
+        "pool": 100,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9338,
+        "answer_hit@8": 0.9574
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8723,
+        "answer_hit@8": 0.9149
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 9,
+      "broken": 10,
+      "latency_s": {
+        "mean": 4.8779,
+        "p95": 5.356
+      }
+    },
+    {
+      "config": "bgeft@30",
+      "spec": {
+        "scorer": "bgeft",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9338,
+        "answer_hit@8": 0.9149
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8298
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 2,
+      "broken": 3,
+      "latency_s": {
+        "mean": 0.5962,
+        "p95": 0.6361
+      }
+    },
+    {
+      "config": "bgeft@50",
+      "spec": {
+        "scorer": "bgeft",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9305,
+        "answer_hit@8": 0.9149
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8723,
+        "answer_hit@8": 0.8298
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 2,
+      "broken": 4,
+      "latency_s": {
+        "mean": 0.9237,
+        "p95": 0.9822
+      }
+    },
+    {
+      "config": "bgeft@100",
+      "spec": {
+        "scorer": "bgeft",
+        "pool": 100,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9238,
+        "answer_hit@8": 0.9043
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8511,
+        "answer_hit@8": 0.8085
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 1,
+      "broken": 5,
+      "latency_s": {
+        "mean": 1.6221,
+        "p95": 1.7158
+      }
+    },
+    {
+      "config": "bge@30+rrf0.1",
+      "spec": {
+        "scorer": "bge",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.1
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9459,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9444,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8936,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 3,
+      "broken": 0,
+      "latency_s": {
+        "mean": 0.5996,
+        "p95": 0.6401
+      }
+    },
+    {
+      "config": "bge@30+rrf0.25",
+      "spec": {
+        "scorer": "bge",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.25
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9426,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9357,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8936,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 3,
+      "broken": 1,
+      "latency_s": {
+        "mean": 0.5996,
+        "p95": 0.6401
+      }
+    },
+    {
+      "config": "bge@30+rrf0.5",
+      "spec": {
+        "scorer": "bge",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.5
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9393,
+        "answer_hit@8": 0.9149
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9357,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8298
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 3,
+      "broken": 2,
+      "latency_s": {
+        "mean": 0.5996,
+        "p95": 0.6401
+      }
+    },
+    {
+      "config": "bge@50+rrf0.1",
+      "spec": {
+        "scorer": "bge",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.1
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9426,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9444,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 3,
+      "broken": 1,
+      "latency_s": {
+        "mean": 0.9313,
+        "p95": 0.985
+      }
+    },
+    {
+      "config": "bge@50+rrf0.25",
+      "spec": {
+        "scorer": "bge",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.25
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9393,
+        "answer_hit@8": 0.9149
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9357,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8298
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 3,
+      "broken": 2,
+      "latency_s": {
+        "mean": 0.9313,
+        "p95": 0.985
+      }
+    },
+    {
+      "config": "bge@50+rrf0.5",
+      "spec": {
+        "scorer": "bge",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.5
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9393,
+        "answer_hit@8": 0.9149
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9357,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8298
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 3,
+      "broken": 2,
+      "latency_s": {
+        "mean": 0.9313,
+        "p95": 0.985
+      }
+    },
+    {
+      "config": "bge1024@30+rrf0.1",
+      "spec": {
+        "scorer": "bge1024",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.1
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9426,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9357,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8936,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 3,
+      "broken": 1,
+      "latency_s": {
+        "mean": 0.6345,
+        "p95": 0.7011
+      }
+    },
+    {
+      "config": "bge1024@30+rrf0.25",
+      "spec": {
+        "scorer": "bge1024",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.25
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9393,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9269,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8936,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 3,
+      "broken": 2,
+      "latency_s": {
+        "mean": 0.6345,
+        "p95": 0.7011
+      }
+    },
+    {
+      "config": "bge1024@30+rrf0.5",
+      "spec": {
+        "scorer": "bge1024",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.5
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9393,
+        "answer_hit@8": 0.9149
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9357,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8298
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 3,
+      "broken": 2,
+      "latency_s": {
+        "mean": 0.6345,
+        "p95": 0.7011
+      }
+    },
+    {
+      "config": "bge1024@50+rrf0.1",
+      "spec": {
+        "scorer": "bge1024",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.1
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9393,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9357,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 3,
+      "broken": 2,
+      "latency_s": {
+        "mean": 0.9887,
+        "p95": 1.0973
+      }
+    },
+    {
+      "config": "bge1024@50+rrf0.25",
+      "spec": {
+        "scorer": "bge1024",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.25
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.936,
+        "answer_hit@8": 0.9149
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9269,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8298
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 3,
+      "broken": 3,
+      "latency_s": {
+        "mean": 0.9887,
+        "p95": 1.0973
+      }
+    },
+    {
+      "config": "bge1024@50+rrf0.5",
+      "spec": {
+        "scorer": "bge1024",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.5
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9393,
+        "answer_hit@8": 0.9149
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9357,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8298
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 3,
+      "broken": 2,
+      "latency_s": {
+        "mean": 0.9887,
+        "p95": 1.0973
+      }
+    },
+    {
+      "config": "qwen@30+rrf0.1",
+      "spec": {
+        "scorer": "qwen",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.1
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9404,
+        "answer_hit@8": 0.9362
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9043,
+        "answer_hit@8": 0.8723
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 7,
+      "broken": 6,
+      "latency_s": {
+        "mean": 1.5583,
+        "p95": 1.7714
+      }
+    },
+    {
+      "config": "qwen@30+rrf0.25",
+      "spec": {
+        "scorer": "qwen",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.25
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9404,
+        "answer_hit@8": 0.9362
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9043,
+        "answer_hit@8": 0.8723
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 7,
+      "broken": 6,
+      "latency_s": {
+        "mean": 1.5583,
+        "p95": 1.7714
+      }
+    },
+    {
+      "config": "qwen@30+rrf0.5",
+      "spec": {
+        "scorer": "qwen",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.5
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9338,
+        "answer_hit@8": 0.9149
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9123,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8936,
+        "answer_hit@8": 0.8298
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 7,
+      "broken": 8,
+      "latency_s": {
+        "mean": 1.5583,
+        "p95": 1.7714
+      }
+    },
+    {
+      "config": "qwen@50+rrf0.1",
+      "spec": {
+        "scorer": "qwen",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.1
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9404,
+        "answer_hit@8": 0.9362
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9043,
+        "answer_hit@8": 0.8723
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 7,
+      "broken": 6,
+      "latency_s": {
+        "mean": 2.5865,
+        "p95": 2.914
+      }
+    },
+    {
+      "config": "qwen@50+rrf0.25",
+      "spec": {
+        "scorer": "qwen",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.25
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9404,
+        "answer_hit@8": 0.9362
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9043,
+        "answer_hit@8": 0.8723
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 7,
+      "broken": 6,
+      "latency_s": {
+        "mean": 2.5865,
+        "p95": 2.914
+      }
+    },
+    {
+      "config": "qwen@50+rrf0.5",
+      "spec": {
+        "scorer": "qwen",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.5
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9338,
+        "answer_hit@8": 0.9149
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9123,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8936,
+        "answer_hit@8": 0.8298
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 7,
+      "broken": 8,
+      "latency_s": {
+        "mean": 2.5865,
+        "p95": 2.914
+      }
+    },
+    {
+      "config": "qwents@30+rrf0.1",
+      "spec": {
+        "scorer": "qwents",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.1
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9459,
+        "answer_hit@8": 0.9468
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9357,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9043,
+        "answer_hit@8": 0.8936
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 10,
+      "broken": 7,
+      "latency_s": {
+        "mean": 1.5768,
+        "p95": 1.8152
+      }
+    },
+    {
+      "config": "qwents@30+rrf0.25",
+      "spec": {
+        "scorer": "qwents",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.25
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9305,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8723,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 7,
+      "broken": 9,
+      "latency_s": {
+        "mean": 1.5768,
+        "p95": 1.8152
+      }
+    },
+    {
+      "config": "qwents@30+rrf0.5",
+      "spec": {
+        "scorer": "qwents",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.5
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9338,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 7,
+      "broken": 8,
+      "latency_s": {
+        "mean": 1.5768,
+        "p95": 1.8152
+      }
+    },
+    {
+      "config": "qwents@50+rrf0.1",
+      "spec": {
+        "scorer": "qwents",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.1
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9426,
+        "answer_hit@8": 0.9468
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9357,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8936,
+        "answer_hit@8": 0.8936
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 10,
+      "broken": 8,
+      "latency_s": {
+        "mean": 2.5996,
+        "p95": 2.9186
+      }
+    },
+    {
+      "config": "qwents@50+rrf0.25",
+      "spec": {
+        "scorer": "qwents",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.25
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9338,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 7,
+      "broken": 8,
+      "latency_s": {
+        "mean": 2.5996,
+        "p95": 2.9186
+      }
+    },
+    {
+      "config": "qwents@50+rrf0.5",
+      "spec": {
+        "scorer": "qwents",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.5
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9371,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8936,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 7,
+      "broken": 7,
+      "latency_s": {
+        "mean": 2.5996,
+        "p95": 2.9186
+      }
+    },
+    {
+      "config": "bgeft@30+rrf0.1",
+      "spec": {
+        "scorer": "bgeft",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.1
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9238,
+        "answer_hit@8": 0.883
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9386,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8511,
+        "answer_hit@8": 0.7872
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 0.9787,
+        "answer_hit@8": 0.9787
+      },
+      "recovered": 4,
+      "broken": 7,
+      "latency_s": {
+        "mean": 0.5962,
+        "p95": 0.6361
+      }
+    },
+    {
+      "config": "bgeft@30+rrf0.25",
+      "spec": {
+        "scorer": "bgeft",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.25
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9238,
+        "answer_hit@8": 0.883
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9386,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8511,
+        "answer_hit@8": 0.7872
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 0.9787,
+        "answer_hit@8": 0.9787
+      },
+      "recovered": 4,
+      "broken": 7,
+      "latency_s": {
+        "mean": 0.5962,
+        "p95": 0.6361
+      }
+    },
+    {
+      "config": "bgeft@30+rrf0.5",
+      "spec": {
+        "scorer": "bgeft",
+        "pool": 30,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.5
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9172,
+        "answer_hit@8": 0.8723
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8404,
+        "answer_hit@8": 0.766
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 0.9787,
+        "answer_hit@8": 0.9787
+      },
+      "recovered": 4,
+      "broken": 9,
+      "latency_s": {
+        "mean": 0.5962,
+        "p95": 0.6361
+      }
+    },
+    {
+      "config": "bgeft@50+rrf0.1",
+      "spec": {
+        "scorer": "bgeft",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.1
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9272,
+        "answer_hit@8": 0.883
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9386,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8617,
+        "answer_hit@8": 0.7872
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 0.9787,
+        "answer_hit@8": 0.9787
+      },
+      "recovered": 4,
+      "broken": 6,
+      "latency_s": {
+        "mean": 0.9237,
+        "p95": 0.9822
+      }
+    },
+    {
+      "config": "bgeft@50+rrf0.25",
+      "spec": {
+        "scorer": "bgeft",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.25
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9238,
+        "answer_hit@8": 0.883
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9386,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8511,
+        "answer_hit@8": 0.7872
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 0.9787,
+        "answer_hit@8": 0.9787
+      },
+      "recovered": 4,
+      "broken": 7,
+      "latency_s": {
+        "mean": 0.9237,
+        "p95": 0.9822
+      }
+    },
+    {
+      "config": "bgeft@50+rrf0.5",
+      "spec": {
+        "scorer": "bgeft",
+        "pool": 50,
+        "second": null,
+        "w2": 0.0,
+        "alpha": 0.5
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9205,
+        "answer_hit@8": 0.8723
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9386,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8404,
+        "answer_hit@8": 0.766
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 0.9787,
+        "answer_hit@8": 0.9787
+      },
+      "recovered": 4,
+      "broken": 8,
+      "latency_s": {
+        "mean": 0.9237,
+        "p95": 0.9822
+      }
+    },
+    {
+      "config": "bge1024@30+bgex0.25",
+      "spec": {
+        "scorer": "bge1024",
+        "pool": 30,
+        "second": "bge",
+        "w2": 0.25,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9338,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 0,
+      "broken": 1,
+      "latency_s": {
+        "mean": 1.0775,
+        "p95": 1.1774
+      }
+    },
+    {
+      "config": "bge1024@30+bgex0.5",
+      "spec": {
+        "scorer": "bge1024",
+        "pool": 30,
+        "second": "bge",
+        "w2": 0.5,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9338,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 0,
+      "broken": 1,
+      "latency_s": {
+        "mean": 1.0775,
+        "p95": 1.1774
+      }
+    },
+    {
+      "config": "bge1024@50+bgex0.25",
+      "spec": {
+        "scorer": "bge1024",
+        "pool": 50,
+        "second": "bge",
+        "w2": 0.25,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9305,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8723,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 0,
+      "broken": 2,
+      "latency_s": {
+        "mean": 1.7634,
+        "p95": 1.9103
+      }
+    },
+    {
+      "config": "bge1024@50+bgex0.5",
+      "spec": {
+        "scorer": "bge1024",
+        "pool": 50,
+        "second": "bge",
+        "w2": 0.5,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9305,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9211,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8723,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 0,
+      "broken": 2,
+      "latency_s": {
+        "mean": 1.7634,
+        "p95": 1.9103
+      }
+    },
+    {
+      "config": "qwen@30+bgex0.25",
+      "spec": {
+        "scorer": "qwen",
+        "pool": 30,
+        "second": "bge",
+        "w2": 0.25,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9338,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9123,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8936,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 5,
+      "broken": 6,
+      "latency_s": {
+        "mean": 2.0013,
+        "p95": 2.2458
+      }
+    },
+    {
+      "config": "qwen@30+bgex0.5",
+      "spec": {
+        "scorer": "qwen",
+        "pool": 30,
+        "second": "bge",
+        "w2": 0.5,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.947,
+        "answer_hit@8": 0.9362
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9149,
+        "answer_hit@8": 0.8723
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 5,
+      "broken": 2,
+      "latency_s": {
+        "mean": 2.0013,
+        "p95": 2.2458
+      }
+    },
+    {
+      "config": "qwen@50+bgex0.25",
+      "spec": {
+        "scorer": "qwen",
+        "pool": 50,
+        "second": "bge",
+        "w2": 0.25,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9338,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9123,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8936,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 5,
+      "broken": 6,
+      "latency_s": {
+        "mean": 3.3613,
+        "p95": 3.7323
+      }
+    },
+    {
+      "config": "qwen@50+bgex0.5",
+      "spec": {
+        "scorer": "qwen",
+        "pool": 50,
+        "second": "bge",
+        "w2": 0.5,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.947,
+        "answer_hit@8": 0.9362
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9149,
+        "answer_hit@8": 0.8723
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 5,
+      "broken": 2,
+      "latency_s": {
+        "mean": 3.3613,
+        "p95": 3.7323
+      }
+    },
+    {
+      "config": "qwents@30+bgex0.25",
+      "spec": {
+        "scorer": "qwents",
+        "pool": 30,
+        "second": "bge",
+        "w2": 0.25,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9437,
+        "answer_hit@8": 0.9362
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9043,
+        "answer_hit@8": 0.8723
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 6,
+      "broken": 4,
+      "latency_s": {
+        "mean": 2.0198,
+        "p95": 2.2867
+      }
+    },
+    {
+      "config": "qwents@30+bgex0.5",
+      "spec": {
+        "scorer": "qwents",
+        "pool": 30,
+        "second": "bge",
+        "w2": 0.5,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.947,
+        "answer_hit@8": 0.9362
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9149,
+        "answer_hit@8": 0.8723
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 5,
+      "broken": 2,
+      "latency_s": {
+        "mean": 2.0198,
+        "p95": 2.2867
+      }
+    },
+    {
+      "config": "qwents@50+bgex0.25",
+      "spec": {
+        "scorer": "qwents",
+        "pool": 50,
+        "second": "bge",
+        "w2": 0.25,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9437,
+        "answer_hit@8": 0.9362
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9043,
+        "answer_hit@8": 0.8723
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 6,
+      "broken": 4,
+      "latency_s": {
+        "mean": 3.3744,
+        "p95": 3.7316
+      }
+    },
+    {
+      "config": "qwents@50+bgex0.5",
+      "spec": {
+        "scorer": "qwents",
+        "pool": 50,
+        "second": "bge",
+        "w2": 0.5,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.947,
+        "answer_hit@8": 0.9362
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.9149,
+        "answer_hit@8": 0.8723
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 5,
+      "broken": 2,
+      "latency_s": {
+        "mean": 3.3744,
+        "p95": 3.7316
+      }
+    },
+    {
+      "config": "bgeft@30+bgex0.25",
+      "spec": {
+        "scorer": "bgeft",
+        "pool": 30,
+        "second": "bge",
+        "w2": 0.25,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9371,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 1,
+      "broken": 1,
+      "latency_s": {
+        "mean": 1.0393,
+        "p95": 1.1064
+      }
+    },
+    {
+      "config": "bgeft@30+bgex0.5",
+      "spec": {
+        "scorer": "bgeft",
+        "pool": 30,
+        "second": "bge",
+        "w2": 0.5,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9393,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9357,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.883,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 1,
+      "broken": 0,
+      "latency_s": {
+        "mean": 1.0393,
+        "p95": 1.1064
+      }
+    },
+    {
+      "config": "bgeft@50+bgex0.25",
+      "spec": {
+        "scorer": "bgeft",
+        "pool": 50,
+        "second": "bge",
+        "w2": 0.25,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.9338,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9298,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8723,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 1,
+      "broken": 2,
+      "latency_s": {
+        "mean": 1.6984,
+        "p95": 1.8008
+      }
+    },
+    {
+      "config": "bgeft@50+bgex0.5",
+      "spec": {
+        "scorer": "bgeft",
+        "pool": 50,
+        "second": "bge",
+        "w2": 0.5,
+        "alpha": 0.0
+      },
+      "all": {
+        "n": 151,
+        "recall@8": 0.936,
+        "answer_hit@8": 0.9255
+      },
+      "main": {
+        "n": 57,
+        "recall@8": 0.9357,
+        "answer_hit@8": null
+      },
+      "bridge": {
+        "n": 47,
+        "recall@8": 0.8723,
+        "answer_hit@8": 0.8511
+      },
+      "bridge_direct": {
+        "n": 47,
+        "recall@8": 1.0,
+        "answer_hit@8": 1.0
+      },
+      "recovered": 1,
+      "broken": 1,
+      "latency_s": {
+        "mean": 1.6984,
+        "p95": 1.8008
+      }
+    }
+  ]
+}
