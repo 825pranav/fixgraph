@@ -8,6 +8,9 @@ Cause or Fix; chunks that provide the edges of the best paths are the evidence (
 the paths are serialized as navigation hints for the answer model.
 
 Both fall back to the hybrid (S1) candidates when no seed can be linked, and report it.
+
+S2L is S2 over the graph plus the document link layer (retrieval.graph.add_document_layer).
+S4 fuses S1's candidates with S2L's PPR chunk ranking by reciprocal rank (FusionRetriever).
 Predicted (GNN) edges only change routing; their provenance never becomes evidence.
 
 Used by: bench/cli.py (builds PPRRetriever / PathRetriever for `bench run`).
@@ -87,11 +90,11 @@ class PPRRetriever(_GraphRetrieverBase):
         super().__init__(*args, **kwargs)  # type: ignore[arg-type]
         self.damping = damping
 
-    def retrieve(self, question: str, k: int) -> RetrievalResult:
-        t0 = time.perf_counter()
+    def chunk_scores(self, question: str) -> tuple[dict[str, float], Subgraph] | None:
+        """PPR mass per chunk (sum over the nodes each chunk supports), or None without seeds."""
         seeds = self.seeds(question)
         if not seeds:
-            return self._fallback(question, k, t0)
+            return None
         scores = personalized_pagerank(self.graph.adj, seeds, damping=self.damping)
         chunk_scores: dict[str, float] = defaultdict(float)
         for i in np.nonzero(scores > 1e-9)[0]:
@@ -102,9 +105,60 @@ class PPRRetriever(_GraphRetrieverBase):
             nodes=[self.graph.node_ids[i] for i in top_nodes],
             seeds=[self.graph.node_ids[i] for i in seeds],
         )
-        if not chunk_scores:
+        return (dict(chunk_scores), subgraph) if chunk_scores else None
+
+    def retrieve(self, question: str, k: int) -> RetrievalResult:
+        t0 = time.perf_counter()
+        found = self.chunk_scores(question)
+        if found is None:
             return self._fallback(question, k, t0)
-        return self._finish(question, chunk_scores, k, t0, subgraph, fallback=False)
+        return self._finish(question, found[0], k, t0, found[1], fallback=False)
+
+
+class FusionRetriever:
+    """S4 (DECISIONS.md D34): reciprocal-rank fusion of the hybrid candidates (S1) and the PPR
+    chunk ranking of a graph retriever, then the same cross-encoder. Fixed a priori: k = 60,
+    equal weights, top `candidates` fused chunks reranked. Without seeds it equals S1."""
+
+    name = "S4"
+
+    def __init__(
+        self, hybrid: HybridRetriever, ppr: PPRRetriever, rrf_k: int = 60, candidates: int = 30
+    ) -> None:
+        self.hybrid, self.ppr, self.rrf_k, self.candidates = hybrid, ppr, rrf_k, candidates
+
+    @property
+    def last_seeds(self) -> list[Seed]:
+        return self.ppr.last_seeds
+
+    def retrieve(self, question: str, k: int) -> RetrievalResult:
+        t0 = time.perf_counter()
+        dense = self.hybrid.candidates_for(question, self.hybrid.candidates)
+        found = self.ppr.chunk_scores(question)
+        fused: dict[str, float] = defaultdict(float)
+        for rank, (cid, _) in enumerate(dense):
+            fused[cid] += 1.0 / (self.rrf_k + rank + 1)
+        subgraph = None
+        if found is not None:
+            graph_ranked = sorted(found[0].items(), key=lambda x: -x[1])[: self.hybrid.candidates]
+            for rank, (cid, _) in enumerate(graph_ranked):
+                fused[cid] += 1.0 / (self.rrf_k + rank + 1)
+            subgraph = found[1]
+        cands = sorted(fused.items(), key=lambda x: -x[1])[: self.candidates]
+        t1 = time.perf_counter()
+        ranked = self.hybrid.rerank(question, cands, k)
+        t2 = time.perf_counter()
+        return RetrievalResult(
+            chunk_ids=[c for c, _ in ranked],
+            scores=[s for _, s in ranked],
+            subgraph=subgraph,
+            timings={
+                "fuse_s": t1 - t0,
+                "rerank_s": t2 - t1,
+                "total_s": t2 - t0,
+                "fallback": float(found is None),
+            },
+        )
 
 
 # Path search -------------------------------------------------------------------------------

@@ -1,4 +1,5 @@
-"""`fixgraph index build` and `fixgraph bench run | report`."""
+"""`fixgraph index build` and `fixgraph bench run | report | ... | label-split |
+judge-calibrate`."""
 
 import json
 import logging
@@ -9,6 +10,7 @@ import typer
 from tqdm import tqdm
 
 from fixgraph.bench import run as R
+from fixgraph.bench.judge import JudgeExample, JudgeVariant
 from fixgraph.bench.schema import Question, QuestionFilter, read_questions, select_questions
 from fixgraph.core.config import Settings, load_settings
 from fixgraph.ingest.store import read_articles, read_chunks
@@ -62,7 +64,7 @@ def index_build() -> None:
     typer.echo(f"indexed {len(chunks)} chunks -> {paths.index}")
 
 
-_WHICH_HELP = "all | screened (auto-screen passed or human-verified) | verified (human only)."
+_WHICH_HELP = "all | screened (auto-screen passed or verified) | verified (see verified_by)."
 
 
 def _load_questions(questions_file: str, which: str, limit: int | None) -> list[Question]:
@@ -91,6 +93,7 @@ def bench_run(
     type_weights: bool = typer.Option(True, help="--no-type-weights = PPR ablation."),
     kg_dir: str | None = typer.Option(None, help="Alternative KG (e.g. data/kg_nocanon)."),
     which: str = typer.Option("all", "--questions", help=_WHICH_HELP),
+    judge_variant: str = typer.Option("v1", help="Judge prompt v1-v4 (D33)."),
 ) -> None:
     """Run benchmark stages; one heavy model on the GPU at a time."""
     from fixgraph.llm.factory import build_llm_client
@@ -137,7 +140,17 @@ def bench_run(
         answers = [R.AnswerRow.model_validate(r) for r in R._read(out / "answers.jsonl")]
         client = build_llm_client(settings)
         try:
-            R.stage_judge(questions, answers, chunk_text, client, judge_model, out / "judged.jsonl")
+            variant = _judge_variant(judge_variant)
+            R.stage_judge(
+                questions,
+                answers,
+                chunk_text,
+                client,
+                judge_model,
+                out / "judged.jsonl",
+                variant,
+                _judge_examples(settings) if variant == "v4" else [],
+            )
         finally:
             client.close()
             _unload(settings, judge_model)
@@ -175,7 +188,7 @@ def _retrieve(
         systems: dict[str, Retriever] = {}
         if "S1" in system_list:
             systems["S1"] = hybrid
-        if {"S2", "S3"} & set(system_list):
+        if {"S2", "S3", "S2L", "S4"} & set(system_list):
             kg = read_kg(Path(kg_dir) if kg_dir else paths.kg)
             graph = build_graph_index(kg, use_type_weights=type_weights)
             counts = {graph.node_ids[i]: len(c) for i, c in graph.node_chunks.items()}
@@ -192,6 +205,25 @@ def _retrieve(
                 systems["S2"] = PPRRetriever(graph, linker, hybrid, mentions)
             if "S3" in system_list:
                 systems["S3"] = PathRetriever(graph, linker, hybrid, mentions)
+            if {"S2L", "S4"} & set(system_list):
+                from fixgraph.bench.schema import article_of
+                from fixgraph.ingest.links import read_links
+                from fixgraph.retrieval.graph import add_document_layer
+                from fixgraph.retrieval.graphrag import FusionRetriever
+
+                links = [
+                    (x.src_article, x.dst_article, x.src_chunk_id)
+                    for x in read_links(paths.corpus / "links.parquet")
+                ]
+                if not links:
+                    raise typer.BadParameter("S2L/S4 need data/corpus/links.parquet")
+                s2l = PPRRetriever(add_document_layer(graph, links, article_of), linker, hybrid,
+                                   mentions)  # fmt: skip
+                s2l.name = "S2L"
+                if "S2L" in system_list:
+                    systems["S2L"] = s2l
+                if "S4" in system_list:
+                    systems["S4"] = FusionRetriever(hybrid, s2l)
         if "S0" in system_list:
             systems["S0"] = NoRetrieval()
         return R.stage_retrieve(questions, systems, out / "retrieval.jsonl")
@@ -216,6 +248,12 @@ def report_(
     answers = [R.AnswerRow.model_validate(r) for r in R._read(out / "answers.jsonl")]
     judged = [R.JudgeRow.model_validate(r) for r in R._read(out / "judged.jsonl")]
     report = R.build_report(questions, retrievals, answers, judged)
+    meta = out / "judge_meta.json"
+    report["judge"] = (
+        json.loads(meta.read_text(encoding="utf-8"))
+        if meta.exists()
+        else {"model": settings.llm.judge_model, "variant": "v1"}  # runs judged before D33
+    )
     stem = "report" if which == "all" else f"report_{which}"  # one file per question filter
     (out / f"{stem}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     md = R.render_markdown(report)
@@ -388,3 +426,297 @@ def bench_kappa(run_name: str = typer.Option("dev")) -> None:
     _, judged = load_run(settings.paths.results / run_name)
     labels = read_labels(settings.paths.bench / f"judge_labels_{run_name}.jsonl")
     typer.echo(agreement(labels, judged).model_dump_json(indent=2))
+
+
+# --- judge calibration (D33) ----------------------------------------------------------------
+
+_LABEL_RUN = "test"  # the run whose blind labels calibrate the judge
+_SPLIT_FILE = "judge_label_split_test.json"
+_CALIBRATION = Path("results/judge/calibration.json")
+
+
+def _judge_variant(name: str) -> JudgeVariant:
+    from fixgraph.bench.judge import VARIANTS
+
+    if name not in VARIANTS:
+        raise typer.BadParameter(f"judge variant must be one of {VARIANTS}")
+    return cast(JudgeVariant, name)
+
+
+def _judge_examples(settings: Settings) -> list[JudgeExample]:
+    """v4 worked examples: fixed dev items of the calibration split (see pick_examples)."""
+    from fixgraph.bench.validate import LabelSplit, load_run, pick_examples, read_labels
+
+    paths = settings.paths
+    labels = read_labels(paths.bench / f"judge_labels_{_LABEL_RUN}.jsonl")
+    split = LabelSplit.model_validate_json((paths.bench / _SPLIT_FILE).read_text(encoding="utf-8"))
+    answers, _ = load_run(paths.results / _LABEL_RUN)
+    questions = {q.qid: q for q in read_questions(paths.bench / "generated.jsonl")}
+    score = {(x.qid, x.system): x.score for x in labels}
+    out = []
+    for qid, system in pick_examples(labels, split.dev):
+        q = questions[qid]
+        out.append(
+            JudgeExample(
+                question=q.question,
+                reference=q.gold_answer,
+                key_facts=q.key_facts,
+                answer=answers[(qid, system)],
+                score=score[(qid, system)],
+            )
+        )
+    return out
+
+
+@app.command("label-split")
+def label_split(seed: int = typer.Option(13)) -> None:
+    """Fix which judge labels may be used to design prompts (dev, 1/3) vs held out (2/3)."""
+    from fixgraph.bench.validate import read_labels, split_labels
+
+    paths = load_settings().paths
+    target = paths.bench / _SPLIT_FILE
+    if target.exists():
+        raise typer.BadParameter(f"{target} exists; the split is fixed once (D33)")
+    split = split_labels(read_labels(paths.bench / f"judge_labels_{_LABEL_RUN}.jsonl"), seed=seed)
+    target.write_text(split.model_dump_json(indent=1), encoding="utf-8")
+    typer.echo(f"dev {len(split.dev)} / heldout {len(split.heldout)} -> {target}")
+
+
+@app.command("judge-calibrate")
+def judge_calibrate(
+    variants: list[str] = typer.Option(..., "--variant", help="Repeatable: v1 v2 v3 v4."),
+    split_name: str = typer.Option("dev", "--split", help="dev | heldout (heldout runs once)."),
+) -> None:
+    """Agreement (kappa) of judge prompt variants with the blind labels on one split; every
+    run is appended to results/judge/calibration.json."""
+    from fixgraph.bench.judge import judge_answer
+    from fixgraph.bench.validate import LabelSplit, agreement, load_run, pick_examples, read_labels
+    from fixgraph.llm.factory import build_llm_client
+
+    settings = load_settings()
+    paths = settings.paths
+    if split_name not in ("dev", "heldout"):
+        raise typer.BadParameter("--split must be dev or heldout")
+    log = json.loads(_CALIBRATION.read_text(encoding="utf-8")) if _CALIBRATION.exists() else []
+    if split_name == "heldout" and any(r["split"] == "heldout" for r in log):
+        raise typer.BadParameter("the held-out split was already scored (D33: once only)")
+    if split_name == "heldout" and len(variants) != 1:
+        raise typer.BadParameter("score exactly one chosen variant on the held-out split")
+    labels = read_labels(paths.bench / f"judge_labels_{_LABEL_RUN}.jsonl")
+    split = LabelSplit.model_validate_json((paths.bench / _SPLIT_FILE).read_text(encoding="utf-8"))
+    keys = set(split.dev if split_name == "dev" else split.heldout)
+    answers, _ = load_run(paths.results / _LABEL_RUN)
+    questions = {q.qid: q for q in read_questions(paths.bench / "generated.jsonl")}
+    client = build_llm_client(settings)
+    try:
+        for name in variants:
+            variant = _judge_variant(name)
+            examples = _judge_examples(settings) if variant == "v4" else []
+            excluded = set(pick_examples(labels, split.dev)) if variant == "v4" else set()
+            scores: dict[tuple[str, str], float] = {}
+            for qid, system in tqdm(sorted(keys - excluded), desc=f"judge {variant}"):
+                text = answers[(qid, system)]
+                out = judge_answer(
+                    client, questions[qid], text, not text, settings.llm.judge_model, variant,
+                    examples,
+                )  # fmt: skip
+                scores[(qid, system)] = out.score
+            ag = agreement([x for x in labels if (x.qid, x.system) in scores], scores)
+            entry = {
+                "variant": variant,
+                "split": split_name,
+                "judge_model": settings.llm.judge_model,
+                "excluded_examples": sorted([list(k) for k in excluded]),
+                **ag.model_dump(),
+            }
+            log.append(entry)
+            typer.echo(json.dumps(entry))
+    finally:
+        client.close()
+        _unload(settings, settings.llm.judge_model)
+    _CALIBRATION.parent.mkdir(parents=True, exist_ok=True)
+    _CALIBRATION.write_text(json.dumps(log, indent=2) + "\n", encoding="utf-8")
+
+
+# --- bridge benchmark (D35) -------------------------------------------------------------------
+
+_BRIDGE_FILE = "data/bench/bridge.jsonl"
+_BRIDGE_FROZEN = Path("results/bridge/frozen.json")
+
+
+@app.command("bridge-generate")
+def bridge_generate(out_file: str = typer.Option(_BRIDGE_FILE)) -> None:
+    """Matched bridge / direct question pairs from Apple's conditional links (D35 rule)."""
+    from collections import defaultdict
+
+    from fixgraph.bench.bridge import generate_pair, select_candidates
+    from fixgraph.bench.schema import write_questions
+    from fixgraph.ingest.links import read_links
+    from fixgraph.llm.factory import build_llm_client
+
+    settings = load_settings()
+    paths = settings.paths
+    if _BRIDGE_FROZEN.exists():
+        raise typer.BadParameter("the bridge set is frozen (D35); it is not regenerated")
+    _, chunk_text = _chunk_docs(settings)
+    titles = {a.article_id: a.title for a in read_articles(paths.articles)}
+    by_article: dict[str, list[str]] = defaultdict(list)
+    for c in read_chunks(paths.chunks):
+        by_article[c.article_id].append(c.chunk_id)
+    cands = select_candidates(read_links(paths.corpus / "links.parquet"), titles, by_article,
+                              seed=settings.seed)  # fmt: skip
+    client = build_llm_client(settings)
+    results = []
+    try:
+        for i, cand in enumerate(tqdm(cands, desc="bridge")):
+            results.append(
+                generate_pair(client, cand, chunk_text, settings.llm.judge_model, f"b{i:03d}")
+            )
+    finally:
+        client.close()
+        _unload(settings, settings.llm.judge_model)
+    qs = [q for r in results for q in r.questions]
+    write_questions(qs, Path(out_file))
+    log = Path("results/bridge/generation.json")
+    log.parent.mkdir(parents=True, exist_ok=True)
+    log.write_text(
+        json.dumps(
+            {
+                "candidates": len(cands),
+                "pairs_kept": sum(r.ok for r in results),
+                "rejections": [
+                    {
+                        "src": r.candidate.link.src_article,
+                        "dst": r.candidate.link.dst_article,
+                        "reason": r.reason,
+                    }
+                    for r in results
+                    if not r.ok
+                ],
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    typer.echo(f"{sum(r.ok for r in results)}/{len(cands)} pairs -> {out_file}")
+
+
+@app.command("bridge-freeze")
+def bridge_freeze(questions_file: str = typer.Option(_BRIDGE_FILE)) -> None:
+    """Freeze the reviewed bridge set: record its SHA-256 and counts before any system runs."""
+    import hashlib
+
+    if _BRIDGE_FROZEN.exists():
+        raise typer.BadParameter(f"already frozen: {_BRIDGE_FROZEN}")
+    raw = Path(questions_file).read_bytes()
+    qs = read_questions(Path(questions_file))
+    kept = [q for q in qs if q.verified]
+    pairs = {q.qid[:-1] for q in kept}
+    complete = {p for p in pairs if {f"{p}a", f"{p}d"} <= {q.qid for q in kept}}
+    if len(complete) != len(pairs):
+        raise typer.BadParameter("review must keep or drop pairs as a unit")
+    _BRIDGE_FROZEN.parent.mkdir(parents=True, exist_ok=True)
+    _BRIDGE_FROZEN.write_text(
+        json.dumps(
+            {
+                "file": questions_file,
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "questions": len(qs),
+                "verified_pairs": len(complete),
+                "verified_by": sorted({q.verified_by for q in kept}),
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    typer.echo(f"frozen {len(complete)} verified pairs ({_BRIDGE_FROZEN})")
+
+
+@app.command("bridge-report")
+def bridge_report_cmd(
+    run_name: str = typer.Option("bridge"),
+    questions_file: str = typer.Option(_BRIDGE_FILE),
+    out: str = typer.Option("results/bridge/bridge_report.json"),
+) -> None:
+    """Answer-chunk hit@8, correctness, hop cost and crossover tests on verified pairs (D35)."""
+    from fixgraph.bench.bridge import bridge_report
+
+    settings = load_settings()
+    run_dir = settings.paths.results / run_name
+    qs = [q for q in read_questions(Path(questions_file)) if q.verified]
+    ranked = {
+        (r["qid"], r["system"]): r["result"]["chunk_ids"]
+        for r in R._read(run_dir / "retrieval.jsonl")
+    }
+    judged_file = run_dir / "judged.jsonl"  # optional: retrieval-only runs have no judge stage
+    judged = (
+        {(r["qid"], r["system"]): float(r["judge"]["score"]) for r in R._read(judged_file)}
+        if judged_file.exists()
+        else {}
+    )
+    report = bridge_report(qs, ranked, judged)
+    meta = run_dir / "judge_meta.json"
+    if meta.exists():
+        report["judge"] = json.loads(meta.read_text(encoding="utf-8"))
+    frozen = Path("results/bridge/frozen.json")
+    if frozen.exists():
+        report["frozen"] = json.loads(frozen.read_text(encoding="utf-8"))
+    Path(out).parent.mkdir(parents=True, exist_ok=True)
+    Path(out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    typer.echo(json.dumps(report, indent=2))
+
+
+@app.command("bridge-import")
+def bridge_import(
+    candidates_file: str = typer.Option(..., help="JSON list of BridgeCandidate (seeded rule)."),
+    pairs_files: list[str] = typer.Option(..., "--pairs", help="JSONL pairs written by Claude."),
+    out_file: str = typer.Option(_BRIDGE_FILE),
+) -> None:
+    """Run externally written pairs (D35 amendment) through the same mechanical checks."""
+    from fixgraph.bench.bridge import BridgeCandidate, BridgePair, BridgeResult, check_pair
+    from fixgraph.bench.schema import write_questions
+
+    if _BRIDGE_FROZEN.exists():
+        raise typer.BadParameter("the bridge set is frozen (D35)")
+    settings = load_settings()
+    _, chunk_text = _chunk_docs(settings)
+    raw = json.loads(Path(candidates_file).read_text(encoding="utf-8"))
+    cands = {f"b{i:03d}": BridgeCandidate.model_validate(c) for i, c in enumerate(raw)}
+    written: dict[str, dict[str, object]] = {}
+    for f in pairs_files:
+        for line in Path(f).read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                row = json.loads(line)
+                written[row["pid"]] = row
+    results: list[BridgeResult] = []
+    for pid, cand in cands.items():
+        row = written.get(pid)
+        if row is None or row.get("skip"):
+            reason = "not written" if row is None else f"writer skipped: {row.get('skip_reason')}"
+            results.append(BridgeResult(candidate=cand, ok=False, reason=reason))
+            continue
+        pair = BridgePair.model_validate({k: row[k] for k in BridgePair.model_fields})
+        results.append(check_pair(pair, cand, chunk_text, pid, source="bridge-claude"))
+    write_questions([q for r in results for q in r.questions], Path(out_file))
+    log = Path("results/bridge/generation.json")
+    log.parent.mkdir(parents=True, exist_ok=True)
+    log.write_text(
+        json.dumps(
+            {
+                "generator": "claude-opus-5-5 (D35 amendment)",
+                "candidates": len(cands),
+                "pairs_passed_checks": sum(r.ok for r in results),
+                "rejections": [
+                    {"pid": pid, "reason": r.reason}
+                    for pid, r in zip(cands, results, strict=True)
+                    if not r.ok
+                ],
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    typer.echo(f"{sum(r.ok for r in results)}/{len(cands)} pairs passed -> {out_file}")

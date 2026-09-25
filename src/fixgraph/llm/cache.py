@@ -67,20 +67,37 @@ class SQLiteCache:
 
 
 class CachedLLMClient:
-    """Wraps any LLMClient; identical requests are served from the cache."""
+    """Wraps any LLMClient; identical requests are served from the cache. Counts hits and
+    misses (thread-safe) so runs and the API can report their cache hit rate."""
 
     def __init__(self, inner: LLMClient, cache: SQLiteCache) -> None:
         self.inner = inner
         self.cache = cache
+        self.hits = 0
+        self.misses = 0
+        self._count_lock = threading.Lock()
 
     def complete(self, request: LLMRequest) -> LLMResponse:
         key = cache_key(request)
         hit = self.cache.get(key)
         if hit is not None:
+            with self._count_lock:
+                self.hits += 1
             return hit.model_copy(update={"cached": True})
         response = self.inner.complete(request)
         self.cache.put(key, response)
+        with self._count_lock:
+            self.misses += 1
         return response
+
+    def stats(self) -> dict[str, float]:
+        with self._count_lock:
+            total = self.hits + self.misses
+            return {
+                "hits": self.hits,
+                "misses": self.misses,
+                "hit_rate": round(self.hits / total, 4) if total else 0.0,
+            }
 
     def close(self) -> None:
         self.inner.close()

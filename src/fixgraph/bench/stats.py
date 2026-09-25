@@ -1,5 +1,6 @@
 """Statistics for the benchmark (spec §11.4): bootstrap CIs, paired permutation tests, Holm
-correction, paired effect sizes, Cohen's kappa. Pure numpy, seeded, deterministic.
+correction, paired effect sizes, Cohen's kappa (plain and linear-weighted). Pure numpy,
+seeded, deterministic.
 
 Used by: bench/run.py (report stage), bench/validate.py (Cohen's kappa for judge agreement).
 """
@@ -81,3 +82,21 @@ def cohens_kappa(rater1: Sequence[Hashable], rater2: Sequence[Hashable]) -> floa
     po = np.trace(m) / n
     pe = float((m.sum(axis=0) * m.sum(axis=1)).sum() / n**2)
     return 1.0 if pe == 1.0 else float((po - pe) / (1 - pe))
+
+
+def weighted_kappa(rater1: Sequence[float], rater2: Sequence[float]) -> float:
+    """Linear-weighted Cohen's kappa for ordinal scores (e.g. 0 / 0.5 / 1): a one-step
+    disagreement costs half of a two-step one. Weights are |a - b| / (max - min)."""
+    if len(rater1) != len(rater2) or not rater1:
+        raise ValueError("raters must label the same non-empty set of items")
+    a = np.asarray(rater1, dtype=np.float64)
+    b = np.asarray(rater2, dtype=np.float64)
+    cats = np.unique(np.concatenate([a, b]))
+    span = float(cats.max() - cats.min())
+    if span == 0:
+        return 1.0
+    observed = float(np.abs(a - b).mean()) / span
+    pa = np.array([(a == c).mean() for c in cats])
+    pb = np.array([(b == c).mean() for c in cats])
+    expected = float((np.outer(pa, pb) * np.abs(cats[:, None] - cats[None, :])).sum()) / span
+    return 1.0 if expected == 0 else 1.0 - observed / expected

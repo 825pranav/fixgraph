@@ -52,34 +52,157 @@ that benchmark plus human verification is the next step. Grounding works across 
 ~80–87% of citations point at gold evidence and the verifier finds 8% unsupported claims.
 Abstention is weak for a 4B model: 2 of 3 unanswerable questions were answered anyway.
 
-### Test benchmark: multi-article questions (retrieval, 2026-09-25)
+### Test benchmark: multi-article questions (2026-09-25)
 
-> **Status:** 191 questions generated from KG paths (D27–D29); 112 pass the automatic
-> pre-screen, **none human-verified yet**. Retrieval and answering are complete; the judging
-> stage was interrupted (the machine ran low on memory at 215/764 judgements), so answer
-> correctness is not reported yet. The retrieval numbers below need no judge.
+> **Status:** 191 questions generated from KG paths (D27–D29); **93 kept after review**.
+> The review was done by a model (Claude Opus 5.5, `verified_by: claude-opus-5-5`), not a
+> human: every question was checked against the full text of its gold chunks, with a
+> keep/reject reason per question in `data/bench/generated_review.jsonl`. It is stricter than
+> the automatic pre-screen (27 kept questions had failed the screen, ~46 that passed it were
+> rejected) but it is **not human verification**. The qwen3:8b judge's κ against blind labels
+> is **0.38**, below the 0.6 target (see [Judge validation](#judge-validation)), so treat
+> correctness as a ranking signal, not an absolute score. Retrieval metrics need no judge.
+>
+> Artifacts: `results/test/report_verified.{md,json}` (93 reviewed questions),
+> `results/test/report.{md,json}` (all 191), `results/test/retrieval_recall_at8.json`,
+> `results/test/judge_kappa.json`.
 
-recall@8 of gold evidence chunks (S1 hybrid RAG, S2 PPR GraphRAG, S3 typed paths); p = paired
-permutation test vs S1, not multiple-comparison corrected. Per-question values: `results/test/retrieval_recall_at8.json`.
+93 reviewed questions (49 multi-article, 44 single-article; 43 multi_constraint, 31
+single_hop, 11 error_code, 8 version_conditional). Mean [95% bootstrap CI]:
+
+| metric | S0 closed-book | S1 hybrid RAG | S2 PPR GraphRAG | S3 typed paths |
+|---|---|---|---|---|
+| correctness (0/0.5/1) | 0.31 [0.26, 0.37] | **0.65** [0.58, 0.71] | 0.62 [0.55, 0.68] | 0.58 [0.52, 0.64] |
+| key-fact recall | 0.29 [0.22, 0.36] | **0.78** [0.71, 0.85] | 0.77 [0.69, 0.84] | 0.71 [0.63, 0.78] |
+| recall@8 (gold chunks) | — | **0.91** [0.87, 0.95] | 0.84 [0.77, 0.90] | 0.80 [0.73, 0.87] |
+| support-set complete@8 | — | **0.83** [0.75, 0.90] | 0.74 [0.66, 0.83] | 0.74 [0.66, 0.83] |
+| citation precision | — | 0.57 [0.51, 0.64] | 0.57 [0.50, 0.65] | 0.59 [0.52, 0.67] |
+| citation recall | — | **0.77** [0.71, 0.83] | 0.71 [0.64, 0.78] | 0.70 [0.62, 0.77] |
+| unsupported-claim rate (verifier) | — | 0.10 [0.07, 0.13] | 0.11 [0.09, 0.15] | 0.10 [0.07, 0.14] |
+| latency p50 / p95 (s, RTX 4050) | 3.6 / 4.5 | 6.1 / 7.9 | 6.2 / 8.5 | 5.3 / 7.1 |
+
+Paired permutation tests vs S1, Holm-corrected:
+
+| subset | metric | S2 − S1 (p_Holm) | S3 − S1 (p_Holm) |
+|---|---|---|---|
+| all 93 | recall@8 | −0.08 (0.013) | −0.12 (0.013) |
+| all 93 | correctness | −0.03 (0.43) | −0.07 (0.16) |
+| multi-article (49) | recall@8 | −0.13 (0.053) | −0.12 (0.076) |
+| multi-article (49) | correctness | +0.01 (1.00) | −0.01 (1.00) |
+
+recall@8 by subset (uncorrected p vs S1):
 
 | questions | n | S1 | S2 | S3 | p (S2 / S3 vs S1) |
 |---|---|---|---|---|---|
-| all generated | 191 | 0.81 | 0.77 | 0.71 | 0.115 / 0.001 |
-| auto-screen passed | 112 | **0.88** | 0.80 | 0.76 | 0.017 / 0.003 |
-| screened, multi-article | 76 | **0.82** | 0.72 | 0.69 | 0.033 / 0.015 |
-| screened, single-article | 36 | 1.00 | 0.97 | 0.92 | 1.000 / 0.246 |
-| screened, multi_constraint | 54 | **0.88** | 0.73 | 0.75 | 0.009 / 0.038 |
-| screened, cross_device | 15 | 0.66 | **0.76** | 0.52 | 0.254 / 0.187 |
-| screened, version_conditional | 9 | 0.72 | 0.67 | 0.72 | 1.000 / 1.000 |
+| all generated | 191 | 0.81 | 0.77 | 0.71 | 0.111 / 0.001 |
+| reviewed | 93 | **0.91** | 0.84 | 0.80 | 0.012 / 0.006 |
+| reviewed, multi-article | 49 | **0.84** | 0.71 | 0.71 | 0.026 / 0.076 |
+| reviewed, single-article | 44 | 1.00 | 0.98 | 0.89 | 1.000 / 0.062 |
+| reviewed, multi_constraint | 43 | **0.85** | 0.72 | 0.71 | 0.038 / 0.057 |
+| reviewed, single_hop | 31 | 0.98 | 0.95 | 0.82 | 1.000 / 0.032 |
+| reviewed, error_code | 11 | 1.00 | 1.00 | 1.00 | 1.000 / 1.000 |
+| reviewed, version_conditional | 8 | 0.88 | 0.81 | 0.94 | 1.000 / 1.000 |
 
-**What this says so far.** Multi-article questions take hybrid RAG off the ceiling (1.00 → 0.82),
-so the benchmark can now separate systems, and graph retrieval still does not beat it: on
-screened multi-article questions both graph systems retrieve significantly less gold evidence.
-Entity linking is not the bottleneck (74% of gold seed nodes are linked, no fallbacks): the
-questions name both symptoms, so dense + BM25 already find both articles. A likely (untested)
-reason PPR does worse is that its mass spreads over the shared fix node's many neighbours. The one type where PPR leads is cross_device (following
-a DEPENDS_ON edge), but n = 15 is too small to call. These numbers may move after human
-verification.
+**What this says.** Multi-article questions take hybrid RAG off the retrieval ceiling
+(1.00 → 0.84), so the benchmark separates systems, and **graph retrieval does not beat it**:
+both graph systems retrieve significantly less gold evidence over the reviewed set, and on
+multi-article questions the gap is largest (−0.13) though no longer significant after Holm
+correction at n = 49. Answer correctness is statistically indistinguishable across S1–S3; the
+answer model recovers from missing evidence about as often as it is misled by it. Entity
+linking is not the bottleneck (74% of gold seed nodes are linked): the questions name both
+symptoms, so dense + BM25 already find both articles. A likely (untested) reason PPR does worse
+is that its mass spreads over the shared fix node's many neighbours.
+
+**What the review removed.** All 30 cross_device questions were rejected: the claimed
+dependency between devices ("the iPhone depends on the car/Mac/Watch") is never stated in the
+evidence, so the generator's DEPENDS_ON paths are not trustworthy and the one type where PPR
+led before (n = 15) is gone. Most version_conditional questions were rejected for the known
+over-merge (a "macOS 14.1" requirement from an unrelated camera article attached through a
+shared "Restart your Mac" node). Others were rejected because the gold answer was a setup step
+("Locate your device", "Tap General") or contradicted the evidence.
+
+#### Judge validation
+
+99 answers from the reviewed questions, balanced across S0–S3 (`fixgraph bench label`
+sampling), were labelled blind (system hidden) with the judge's rubric by two independent
+Claude Opus 5.5 labelers; each labeled all 99. Labeler–labeler agreement: **κ = 0.91** (94/99
+identical); the 5 disagreements were adjudicated. Labels: `data/bench/judge_labels_test.jsonl`
+(final), `data/bench/judge_labels_test_raters.jsonl` (both raters, reasons, adjudications).
+
+| | n | Cohen's κ | linear-weighted κ | exact agreement | mean score (judge / labels) |
+|---|---|---|---|---|---|
+| qwen3:8b judge vs labels | 99 | **0.38** | 0.50 | 0.57 | 0.55 / 0.67 |
+
+Judge (columns) vs labels (rows):
+
+| labels \ judge | 0 | 0.5 | 1 |
+|---|---|---|---|
+| 0 | 14 | 9 | 0 |
+| 0.5 | 4 | 15 | 0 |
+| 1 | 0 | 30 | 27 |
+
+The judge is **systematically one step harsher**, not noisy: it gives 0.5 to 30 of the 57
+answers the labelers scored fully correct, and never disagrees by two steps. System means on
+the labeled sample keep the same order under both (S1 0.78 / S2 0.78 / S3 0.77 / S0 0.36 by
+labels; 0.66 / 0.66 / 0.58 / 0.28 by the judge), so comparisons between systems are more
+trustworthy than absolute correctness. κ is below the 0.6 target, and the reference labels are
+from a model, not a human; a human-labeled sample is still needed.
+
+### Second round: cleaner graph, true multi-hop questions, fusion (2026-09-25)
+
+Protocols D32–D36 in `docs/DECISIONS.md` were written before each run. All labels and reviews
+in this round are by Claude Opus 5.5 (`claude-opus-5-5`), not humans; Claude never grades
+answers or verifies edges, so no Claude output is scored against other Claude output.
+
+**1. Edge audit and verification** (`results/kg/edge_verification.json`). A stratified random
+sample of 209 extracted edges was labelled blind by two raters (κ = 0.82, 18 of 235 statements
+adjudicated): **31.4% of edges are not stated by their source text** (95% CI 25.4–37.5%). Worst:
+DEPENDS_ON 5/5, ADDRESSES 15/29, CAUSED_BY 13/26; the core RESOLVED_BY relation 14/71. A
+qwen3:8b check of every edge against its source chunk, with a code-verified quote
+(`fixgraph kg verify-edges`), kept 2,317 of 2,902 edges:
+
+| | before | after verification |
+|---|---|---|
+| unsupported edges (population-weighted) | 31.4% [25.4, 37.5] | 23.3% [16.9, 29.9] |
+| true edges kept (recall) | — | 87.3% (124/142) |
+| unsupported edges removed | — | 43.3% (29/67) |
+
+The verifier keeps true edges well but is lenient; it was not tuned on these labels (D32).
+
+**2. Retrieval on the verified graph, 93 reviewed questions**
+(`results/kg/retrieval_after_cleaning.json`; recall@8; p = paired permutation vs S1):
+
+| | S1 hybrid | S2 PPR | S2L PPR + article links | S3 paths | **S4 fusion (S1 + S2L)** |
+|---|---|---|---|---|---|
+| all (93) | 0.915 | 0.841 (p=0.013) | 0.856 (p=0.031) | 0.758 (p<0.001) | **0.918** (p=1.0) |
+| multi-article (49) | 0.838 | 0.719 | 0.747 | 0.660 | **0.845** |
+
+Verification changed the graph systems little (S2 0.836 → 0.841; S3 0.799 → 0.758). Fusion
+matches the best system on both subsets; no graph-only system reaches S1.
+
+**3. Bridge benchmark: true multi-hop questions from Apple's own links**
+(`results/bridge/bridge_report.json`, frozen set `results/bridge/frozen.json`, rule D35).
+Apple articles link to each other in conditional sentences ("If your computer doesn't
+recognize your device, learn how to use recovery mode"). Each of 78 reviewed pairs has a
+**bridge** question (A's situation; the linked concept is never named) and a **direct**
+question (asks for C's content outright) with the same gold chunk in C. Questions were written
+by Claude from a seeded, pre-registered candidate rule, checked mechanically in code, reviewed
+by a separate Claude instance (78 of 108 pairs kept) and frozen by hash before any system ran.
+Answer-chunk hit@8, mean [95% CI], Holm-corrected p vs S1:
+
+| | S1 hybrid | S2 PPR | S2L PPR + links | S3 paths | S4 fusion |
+|---|---|---|---|---|---|
+| bridge (78) | **0.83** [0.76, 0.92] | 0.42 (p<0.001) | 0.41 (p<0.001) | 0.27 (p<0.001) | 0.78 (p=0.13) |
+| direct (78) | **1.00** | 0.56 (p<0.001) | 0.62 (p<0.001) | 0.45 (p<0.001) | **1.00** |
+| hop cost (direct − bridge) | 0.17 | 0.14 | 0.21 | 0.18 | 0.22 |
+
+**What this says.** Even on questions whose answer sits behind an unnamed link, hybrid
+retrieval finds the answer chunk 83% of the time, and no graph variant closes the gap; adding
+Apple's links to the graph (S2L) does not help the bridge questions (0.41 vs 0.42). The hop
+costs S1 only 17 points, because the customer's description of the situation is usually
+enough for dense + BM25 search to reach the target article. No system's hop cost differs
+significantly from S1's (crossover tests, all p_Holm ≥ 0.52). Answer correctness on this set
+has not been run yet (retrieval-only round).
 
 ### Knowledge graph
 
@@ -128,16 +251,15 @@ documented in a different article.
 | M2 knowledge graph, validation, resolution, quality report | done; gold set pending human review |
 | M3 hybrid RAG, grounded answers, verifier, stats harness | done |
 | M4 GraphRAG (PPR, typed paths), entity linking | done |
-| M5 benchmark: generation, auto-screen, verification | 191 test questions generated (112 pass the auto-screen); retrieval + answers done, judging interrupted; human verification and judge κ pending |
+| M5 benchmark: generation, auto-screen, verification | done: 93 reviewed path questions + 78 frozen bridge pairs (D35); judge κ = 0.38, recalibration coded (D33), not yet run |
 | M6 GNN: baselines, hetero-SAGE, gap report | done (S4 routing not run) |
 | M7 FastAPI, Docker (CI-built), write-up | done |
 
-Next steps (human review; no GPU needed, see [Human review](#human-review)): verify the
-generated test questions, label ~80 answers to validate the judge, review the 50 gold
-extraction chunks. Then finish judging the test run (GPU, ~2.5 h; cached calls are replayed):
-`fixgraph bench run --questions-file data/bench/generated.jsonl --run-name test --stages judge,report`.
-The run covers all 191 questions, so the verified-only report is one `fixgraph bench report`
-command.
+Next steps (no GPU needed, see [Human review](#human-review)): a human pass over the 93
+model-reviewed questions and ~80 human judge labels (the current reference labels are from a
+model), then review the 50 gold extraction chunks. If human κ stays below 0.6, recalibrate the
+judge prompt (it is one step harsh on fully correct answers) and re-judge; cached answers are
+reused, so only the judge stage re-runs.
 
 ## Repository layout
 
@@ -160,21 +282,30 @@ data/gold, data/bench   committed annotations and questions (no raw article text
 
 ## Limitations
 
-- **Unverified evaluation data.** The 30 dev questions and the 50-chunk extraction gold set
-  were drafted by an AI assistant; the 191 test questions were generated by qwen3:8b from KG
-  paths and checked only by the automatic screen. All are marked `verified: false` /
-  `status: draft` until reviewed with `fixgraph bench verify` and `fixgraph kg annotate`.
-- **No judge validation yet.** The qwen3:8b judge has not been compared with human labels
-  (target: κ ≥ 0.6 on 80–100 answers). The blind labeling tool is in place:
-  `fixgraph bench label` (keys 1 / 5 / 0 per answer, system name hidden) and
-  `fixgraph bench kappa` report Cohen's κ and exact agreement against the judge.
-- **Auto-screen is not verification.** The screen checks answer leaks and support
-  mechanically, but it is still an LLM pass; a manual read of the generated set finds
-  questions that pass it and are still odd.
+- **Model-reviewed, not human-verified, evaluation data.** The 30 dev questions and the
+  50-chunk extraction gold set were drafted by an AI assistant and are still `verified: false`
+  / `status: draft`. The 191 test questions were generated by qwen3:8b; 93 were kept by a
+  Claude Opus 5.5 review against the evidence text (`verified_by: claude-opus-5-5`, decisions
+  in `data/bench/generated_review.jsonl`). A stronger model checking a weaker one's output is
+  better than the auto-screen, but it can share blind spots; a human pass is still needed.
+- **Judge below target agreement.** qwen3:8b vs blind labels: κ = 0.38 (weighted 0.50) on 99
+  answers, target 0.6. The reference labels come from two Claude labelers (κ = 0.91 with each
+  other), not a human. The judge is consistently one step harsh, so absolute correctness is
+  understated; system rankings agree under both.
+- **Auto-screen is a weak filter.** On the test set it kept ~46 questions the review rejected
+  and failed 27 it kept.
+- **Edge verification is lenient.** It removes 43% of unsupported edges while keeping 87% of true
+  ones; 23% of the remaining edges are still unsupported (D32). A stricter verifier needs a fresh
+  labelled sample to be measured honestly.
+- **Graph retrieval does not beat hybrid RAG on any benchmark here**, including true multi-hop
+  bridge questions; fusion (S4) only matches it. See the second-round results.
+- **cross_device generation is broken.** All 30 generated cross_device questions were rejected:
+  the device dependency is never stated in the evidence, so DEPENDS_ON paths need fixing
+  before that question type can test graph retrieval.
 - **Entity resolution over-merges generic fixes.** Fix nodes such as "Restart your Mac" are
   merged across articles, so a requirement from one article ("macOS 14.1") attaches to
-  unrelated symptoms. Several generated `version_conditional` questions inherit this error;
-  the benchmark exposed it, and human review is where they get rejected.
+  unrelated symptoms. Most generated `version_conditional` questions inherited this error
+  and were rejected in review.
 - **Time-boxed corpus.** 500 of 2,531 chunks (whole articles, highest troubleshooting
   relevance); the pipeline runs unchanged on the full corpus.
 - **Not run:** 4B vs 8B extraction comparison, S4 (GNN routing), ablations. All are
@@ -219,6 +350,13 @@ unsupported claims.
 
 ## Reproduce
 
+Second round (D32–D36): `fixgraph kg edge-sample`, `fixgraph kg verify-edges`, `fixgraph kg
+edge-eval`; `fixgraph ingest links`; `fixgraph bench bridge-import` / `bridge-freeze`;
+`fixgraph bench run --questions-file data/bench/bridge.jsonl --questions verified --run-name
+bridge --systems S1,S2,S3,S2L,S4 --stages mentions,retrieve --kg-dir data/kg_verified`, then
+`fixgraph bench bridge-report`; judge calibration: `fixgraph bench judge-calibrate --variant v1
+--variant v2 --variant v3 --variant v4`; serving: `scripts/loadtest.py`.
+
 Tested on native Windows 11 (no WSL) with an NVIDIA RTX 4050 Laptop GPU (6 GB), 16 GB RAM.
 Prerequisites: [uv](https://docs.astral.sh/uv/), [Ollama](https://ollama.com), a recent NVIDIA
 driver (PyTorch wheels bundle the CUDA runtime).
@@ -250,7 +388,10 @@ See `DATA.md` for data provenance and `docs/DECISIONS.md` for every design decis
 ## Human review
 
 Three steps need a person; none needs the GPU. Each saves after every keystroke, so you can
-stop and resume.
+stop and resume. Steps 1 and 2 were run once by a model (see [Judge validation](#judge-validation));
+`bench verify` skips questions already marked verified, so a human pass over the model-kept
+questions means resetting `verified` first, and `bench label` needs its own labels file
+(labels are stored per run in `data/bench/judge_labels_<run>.jsonl`).
 
 ```powershell
 # 1. Verify test questions (y = keep, n = reject, s = skip, q = quit). Screen-passed,

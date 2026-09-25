@@ -1,0 +1,108 @@
+{"pid": "b000", "decision": "keep", "reason": "Answer in gold; natural bridge from A's not-joining-Wi-Fi condition"}
+{"pid": "b002", "decision": "reject", "reason": "Answer adds date/time, VPN, router steps not in gold chunk"}
+{"pid": "b004", "decision": "keep", "reason": "Answer and facts in gold; bridge describes symptom without naming C"}
+{"pid": "b006", "decision": "keep", "reason": "Answer in gold; natural worry about unpairing losing data"}
+{"pid": "b008", "decision": "keep", "reason": "Lock icon/firmware password answer in gold; plausible restore scenario"}
+{"pid": "b010", "decision": "reject", "reason": "Answer uses System Settings > General > Time Machine and Add Backup Disk, not in gold"}
+{"pid": "b012", "decision": "keep", "reason": "Storage alert steps in gold; plausible post-restore alert"}
+{"pid": "b014", "decision": "keep", "reason": "Update steps in gold; bridge hints old software but does not name procedure"}
+{"pid": "b016", "decision": "keep", "reason": "Connection quality advice in gold; bridge says video calls, not FaceTime"}
+{"pid": "b018", "decision": "keep", "reason": "Software Update steps in gold; bridge only hints at a fix"}
+{"pid": "b020", "decision": "keep", "reason": "Globe-with-warning meaning in gold; natural"}
+{"pid": "b022", "decision": "keep", "reason": "Gmail excluded from iCloud backup stated in gold; natural"}
+{"pid": "b024", "decision": "keep", "reason": "Update steps in gold; natural"}
+{"pid": "b026", "decision": "keep", "reason": "Safari via macOS update and Software Update in gold"}
+{"pid": "b028", "decision": "keep", "reason": "80 percent explanations all in gold; natural"}
+{"pid": "b030", "decision": "keep", "reason": "Power checks all in gold; natural"}
+{"pid": "b032", "decision": "keep", "reason": "Service Recommended meaning in gold; bridge avoids the term"}
+{"pid": "b034", "decision": "keep", "reason": "Restart steps in gold; plausible from touch-screen condition"}
+{"pid": "b036", "decision": "keep", "reason": "Blank-screen steps in gold; natural"}
+{"pid": "b038", "decision": "reject", "reason": "Key fact 'force it to restart' not in gold chunk"}
+{"pid": "b040", "decision": "keep", "reason": "Question-mark meaning and fix in gold; bridge avoids naming symbol"}
+{"pid": "b042", "decision": "keep", "reason": "Storage-space advice in gold; natural"}
+{"pid": "b044", "decision": "keep", "reason": "Reset-without-computer steps in gold; 'just the phone' is mild hint"}
+{"pid": "b046", "decision": "keep", "reason": "Passcode Reset steps in gold; natural"}
+{"pid": "b048", "decision": "reject", "reason": "Key fact 'another computer' (and other network) not in gold"}
+{"pid": "b051", "decision": "keep", "reason": "Update steps in gold; natural"}
+{"pid": "b053", "decision": "keep", "reason": "Windows recognition checks in gold; natural"}
+{"pid": "b055", "decision": "keep", "reason": "Pairing steps in gold; bridge avoids 'pair/set up' wording"}
+{"pid": "b057", "decision": "reject", "reason": "Key fact 'Test the power outlet' and restart not in gold"}
+{"pid": "b059", "decision": "reject", "reason": "Answer adds 'choose Update or Restore' not in gold; bridge lifts C's symptom list"}
+{"pid": "b061", "decision": "keep", "reason": "Not Delivered steps in gold; natural"}
+{"pid": "b063", "decision": "keep", "reason": "Backup troubleshooting in gold; natural"}
+{"pid": "b065", "decision": "reject", "reason": "Gold chunk only covers force restart; adapter/cable/temperature facts absent"}
+{"pid": "b067", "decision": "keep", "reason": "iTunes update steps in gold; natural"}
+{"pid": "b069", "decision": "reject", "reason": "Answer adds 'use another computer' not in gold"}
+{"pid": "b071", "decision": "keep", "reason": "Wireless-alert causes (VPN/proxy, not available wirelessly) in gold"}
+{"pid": "b073", "decision": "keep", "reason": "Windows recognition checks in gold; natural"}
+{"pid": "b075", "decision": "keep", "reason": "Restart steps in gold; natural next step"}
+{"pid": "b077", "decision": "keep", "reason": "iTunes update steps in gold; natural"}
+{"pid": "b079", "decision": "reject", "reason": "Key fact 'unlocked' comes from A, not gold"}
+{"pid": "b081", "decision": "reject", "reason": "Recovery-mode button steps/Finder not in gold chunk (only Restore step)"}
+{"pid": "b083", "decision": "reject", "reason": "Restart router and Reset Network Settings not in gold"}
+{"pid": "b085", "decision": "keep", "reason": "Don't Allow behavior and setting in gold; natural"}
+{"pid": "b087", "decision": "keep", "reason": "Forget this Device steps in gold; natural"}
+{"pid": "b089", "decision": "keep", "reason": "Security software/restart/other computer all in gold"}
+{"pid": "b091", "decision": "reject", "reason": "Key fact 'another computer' (different network) not in gold"}
+{"pid": "b093", "decision": "keep", "reason": "Update steps in gold; natural"}
+{"pid": "b096", "decision": "reject", "reason": "Turn off/restart and 24-hour facts not in gold"}
+{"pid": "b099", "decision": "keep", "reason": "AirPods Pro 2 reset steps in gold; natural"}
+{"pid": "b101", "decision": "keep", "reason": "Update steps in gold; natural"}
+{"pid": "b103", "decision": "reject", "reason": "Key fact 'original cable' and restart not in gold; bridge awkward"}
+{"pid": "b105", "decision": "keep", "reason": "Restore Backup steps in gold; bridge avoids 'encrypted backup'"}
+{"pid": "b107", "decision": "keep", "reason": "Update steps in gold; natural"}
+{"pid": "b109", "decision": "keep", "reason": "Remove-apps behavior in gold; natural"}
+{"pid": "b001", "decision": "keep", "reason": "Answer grounded in chunk; bridge natural and does not name Software Update"}
+{"pid": "b003", "decision": "keep", "reason": "Lost Mode steps in chunk; natural stolen-phone question"}
+{"pid": "b005", "decision": "reject", "reason": "APFS volume key fact not in gold chunk (only a footnote marker)"}
+{"pid": "b007", "decision": "reject", "reason": "Restart/reset the SMC key fact not in gold chunk"}
+{"pid": "b009", "decision": "keep", "reason": "Add Backup Disk / Set Up Disk steps in chunk; natural follow-up after erasing"}
+{"pid": "b011", "decision": "keep", "reason": "Cross-device restore exclusions stated in chunk; natural question"}
+{"pid": "b013", "decision": "reject", "reason": "'another USB-C cable that supports charging' key fact not in gold chunk"}
+{"pid": "b015", "decision": "reject", "reason": "Bridge's 'need more space' is A's own topic (answered by freeing storage in A); direct Q's how-to-update part unanswered"}
+{"pid": "b017", "decision": "keep", "reason": "Wi-Fi join steps in chunk; natural cafe scenario"}
+{"pid": "b019", "decision": "keep", "reason": "Retry reset steps in chunk; natural replacement-case scenario"}
+{"pid": "b021", "decision": "keep", "reason": "All facts in chunk; bridge does not name Time Machine troubleshooting"}
+{"pid": "b023", "decision": "reject", "reason": "Restart iPhone, time zone, cellular/Wi-Fi steps not in gold chunk"}
+{"pid": "b025", "decision": "keep", "reason": "Force-restart sequence in chunk; bridge paraphrases 'no Home button'"}
+{"pid": "b027", "decision": "keep", "reason": "All steps in chunk; natural iPhone Safari question"}
+{"pid": "b029", "decision": "reject", "reason": "'force it to restart' key fact not in gold chunk"}
+{"pid": "b031", "decision": "keep", "reason": "Gmail exclusion in chunk; natural question (direct Q broader but answered in part)"}
+{"pid": "b033", "decision": "reject", "reason": "AppleCare 80 percent replacement fact not in gold chunk"}
+{"pid": "b035", "decision": "reject", "reason": "Direct Q asks about all startup screens; answer covers only the globe"}
+{"pid": "b037", "decision": "keep", "reason": "Firmware-password lock icon fact in chunk; plausible scenario"}
+{"pid": "b039", "decision": "reject", "reason": "'Forgot all passwords?' key fact not in gold chunk"}
+{"pid": "b041", "decision": "keep", "reason": "One-Apple-Account rule in chunk; natural used-AirPods question"}
+{"pid": "b043", "decision": "keep", "reason": "All steps in chunk; bridge avoids naming Apple Watch"}
+{"pid": "b045", "decision": "keep", "reason": "iCloud restore steps in chunk; natural post-reset question"}
+{"pid": "b047", "decision": "keep", "reason": "All steps in chunk; natural keyboard pairing question"}
+{"pid": "b049", "decision": "keep", "reason": "Restore Backup steps in chunk; natural post-Error-53 question"}
+{"pid": "b052", "decision": "keep", "reason": "Grayed-out causes in chunk; bridge paraphrases iCloud"}
+{"pid": "b054", "decision": "keep", "reason": "iCloud vs computer facts in chunk; natural question"}
+{"pid": "b056", "decision": "keep", "reason": "Charging On Hold / Charge to Full Now in chunk; bridge does not name the feature"}
+{"pid": "b058", "decision": "keep", "reason": "Login-window/default-picture facts in chunk; plausible post-update question"}
+{"pid": "b060", "decision": "reject", "reason": "Strong signals / Airplane Mode key fact not in gold chunk"}
+{"pid": "b062", "decision": "keep", "reason": "Reconnect steps in chunk; red iPhone icon scenario natural"}
+{"pid": "b064", "decision": "keep", "reason": "Don't Allow consequences in chunk; natural backup scenario"}
+{"pid": "b066", "decision": "keep", "reason": "Face ID force-restart and one-hour charge in chunk"}
+{"pid": "b068", "decision": "keep", "reason": "Finder update steps in chunk; natural follow-up"}
+{"pid": "b070", "decision": "keep", "reason": "Restart and free-storage steps in chunk"}
+{"pid": "b072", "decision": "reject", "reason": "'use a different computer' not in gold chunk"}
+{"pid": "b074", "decision": "keep", "reason": "Home-button force restart in chunk; bridge paraphrases Home button"}
+{"pid": "b076", "decision": "keep", "reason": "Reset-on-watch steps in chunk; natural setup scenario"}
+{"pid": "b078", "decision": "reject", "reason": "'another computer on a different network' not in gold chunk"}
+{"pid": "b080", "decision": "keep", "reason": "SIM inspection steps in chunk; bridge paraphrases nano-SIM"}
+{"pid": "b082", "decision": "keep", "reason": "All steps in chunk; natural activation scenario"}
+{"pid": "b084", "decision": "keep", "reason": "AirPods Pro 2 reset steps in chunk; bridge does not say reset"}
+{"pid": "b086", "decision": "reject", "reason": "'reset network settings' not in gold chunk"}
+{"pid": "b088", "decision": "keep", "reason": "Cable/debris/half-hour steps in chunk; low-battery scenario natural"}
+{"pid": "b090", "decision": "reject", "reason": "Chunk is the Windows section; Allow, Show Sidebar, VPN not in chunk"}
+{"pid": "b092", "decision": "reject", "reason": "'use another computer' not in gold chunk"}
+{"pid": "b095", "decision": "keep", "reason": "FaceTime settings steps in chunk; bridge avoids naming FaceTime"}
+{"pid": "b098", "decision": "keep", "reason": "Same/other network, Mac/iTunes, remove update all in chunk"}
+{"pid": "b100", "decision": "keep", "reason": "Replacement setup steps in chunk; natural mismatch scenario"}
+{"pid": "b102", "decision": "keep", "reason": "Home-button restart steps in chunk; natural No Service follow-up"}
+{"pid": "b104", "decision": "keep", "reason": "Reset All Settings procedure in chunk; natural Journal scenario"}
+{"pid": "b106", "decision": "reject", "reason": "Chunk is the 'no update shown' section; Software Update navigation/install steps not in it"}
+{"pid": "b108", "decision": "keep", "reason": "Software Update steps in chunk; natural Pixelmator scenario"}
+{"pid": "b110", "decision": "keep", "reason": "Erase All Content and Settings steps in chunk; natural selling question"}

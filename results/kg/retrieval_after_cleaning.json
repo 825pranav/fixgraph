@@ -1,0 +1,126 @@
+{
+  "n": 93,
+  "note": "recall@8 on the 93 verified questions; old = data/kg, new = data/kg_verified (D32); S2L/S4 exist only on the new graph (D34)",
+  "rows": [
+    {
+      "subset": "all",
+      "system": "S1",
+      "old": 0.915,
+      "new": 0.915,
+      "new_ci": [
+        0.872,
+        0.953
+      ],
+      "S1": 0.915,
+      "p_vs_S1": 1.0
+    },
+    {
+      "subset": "all",
+      "system": "S2",
+      "old": 0.836,
+      "new": 0.841,
+      "new_ci": [
+        0.777,
+        0.898
+      ],
+      "S1": 0.915,
+      "p_vs_S1": 0.0128
+    },
+    {
+      "subset": "all",
+      "system": "S2L",
+      "old": null,
+      "new": 0.856,
+      "new_ci": [
+        0.798,
+        0.908
+      ],
+      "S1": 0.915,
+      "p_vs_S1": 0.0308
+    },
+    {
+      "subset": "all",
+      "system": "S3",
+      "old": 0.799,
+      "new": 0.758,
+      "new_ci": [
+        0.674,
+        0.835
+      ],
+      "S1": 0.915,
+      "p_vs_S1": 0.0006
+    },
+    {
+      "subset": "all",
+      "system": "S4",
+      "old": null,
+      "new": 0.918,
+      "new_ci": [
+        0.88,
+        0.953
+      ],
+      "S1": 0.915,
+      "p_vs_S1": 1.0
+    },
+    {
+      "subset": "multi-article",
+      "system": "S1",
+      "old": 0.838,
+      "new": 0.838,
+      "new_ci": [
+        0.769,
+        0.906
+      ],
+      "S1": 0.838,
+      "p_vs_S1": 1.0
+    },
+    {
+      "subset": "multi-article",
+      "system": "S2",
+      "old": 0.709,
+      "new": 0.719,
+      "new_ci": [
+        0.628,
+        0.804
+      ],
+      "S1": 0.838,
+      "p_vs_S1": 0.0248
+    },
+    {
+      "subset": "multi-article",
+      "system": "S2L",
+      "old": null,
+      "new": 0.747,
+      "new_ci": [
+        0.667,
+        0.823
+      ],
+      "S1": 0.838,
+      "p_vs_S1": 0.0604
+    },
+    {
+      "subset": "multi-article",
+      "system": "S3",
+      "old": 0.714,
+      "new": 0.66,
+      "new_ci": [
+        0.537,
+        0.776
+      ],
+      "S1": 0.838,
+      "p_vs_S1": 0.0113
+    },
+    {
+      "subset": "multi-article",
+      "system": "S4",
+      "old": null,
+      "new": 0.845,
+      "new_ci": [
+        0.782,
+        0.908
+      ],
+      "S1": 0.838,
+      "p_vs_S1": 1.0
+    }
+  ]
+}

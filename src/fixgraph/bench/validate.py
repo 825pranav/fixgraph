@@ -15,7 +15,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from fixgraph.bench.schema import Question
-from fixgraph.bench.stats import cohens_kappa
+from fixgraph.bench.stats import cohens_kappa, weighted_kappa
 
 _KEYS = {"0": 0.0, "5": 0.5, "1": 1.0}
 
@@ -93,6 +93,7 @@ def label_loop(
 class Agreement(BaseModel):
     n: int
     kappa: float
+    weighted_kappa: float
     exact_agreement: float
     judge_mean: float
     human_mean: float
@@ -111,6 +112,7 @@ def agreement(labels: list[HumanLabel], judge_scores: dict[tuple[str, str], floa
     return Agreement(
         n=len(pairs),
         kappa=round(cohens_kappa(human, judge), 3),
+        weighted_kappa=round(weighted_kappa([h for h, _ in pairs], [j for _, j in pairs]), 3),
         exact_agreement=round(sum(h == j for h, j in pairs) / len(pairs), 3),
         judge_mean=round(sum(j for _, j in pairs) / len(pairs), 3),
         human_mean=round(sum(h for h, _ in pairs) / len(pairs), 3),
@@ -136,3 +138,44 @@ def load_run(run_dir: Path) -> tuple[dict[tuple[str, str], str], dict[tuple[str,
         r = json.loads(line)
         judged[(r["qid"], r["system"])] = float(r["judge"]["score"])
     return answers, judged
+
+
+# --- judge calibration (D33) ----------------------------------------------------------------
+
+
+class LabelSplit(BaseModel):
+    """Which labelled (qid, system) pairs may be used to design judge prompts (dev) and which
+    are only scored once (heldout). Fixed by seed before any prompt is tried."""
+
+    seed: int
+    dev: list[tuple[str, str]]
+    heldout: list[tuple[str, str]]
+
+
+def split_labels(labels: list[HumanLabel], dev_frac: float = 1 / 3, seed: int = 13) -> LabelSplit:
+    """Stratified by system so both halves see every retriever."""
+    rng = random.Random(seed)
+    by_system: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    for x in sorted(labels, key=lambda x: (x.system, x.qid)):
+        by_system[x.system].append((x.qid, x.system))
+    dev: list[tuple[str, str]] = []
+    held: list[tuple[str, str]] = []
+    for system in sorted(by_system):
+        pool = by_system[system]
+        rng.shuffle(pool)
+        k = round(len(pool) * dev_frac)
+        dev += pool[:k]
+        held += pool[k:]
+    return LabelSplit(seed=seed, dev=sorted(dev), heldout=sorted(held))
+
+
+def pick_examples(labels: list[HumanLabel], dev: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """v4 worked examples: the first dev item (by qid, system) at each score level 1, 0.5, 0."""
+    score = {(x.qid, x.system): x.score for x in labels}
+    out: list[tuple[str, str]] = []
+    for level in (1.0, 0.5, 0.0):
+        for key in sorted(dev):
+            if score.get(key) == level:
+                out.append(key)
+                break
+    return out

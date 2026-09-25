@@ -1,0 +1,96 @@
+{
+  "n_labelled": 209,
+  "hallucinated_rate_before": {
+    "mean": 0.314,
+    "lo": 0.254,
+    "hi": 0.375
+  },
+  "hallucinated_rate_after": {
+    "mean": 0.233,
+    "lo": 0.169,
+    "hi": 0.299
+  },
+  "verifier_vs_labels": {
+    "tp": 124,
+    "fp": 38,
+    "fn": 18,
+    "tn": 29,
+    "precision_keep": 0.765,
+    "recall_keep": 0.873,
+    "reject_precision": 0.617
+  },
+  "edges_total": 2902,
+  "edges_kept": 2317,
+  "by_relation": {
+    "ADDRESSES": {
+      "n_sampled": 29,
+      "labelled_unsupported": 15,
+      "edges_total": 422,
+      "edges_kept": 295
+    },
+    "APPLIES_TO": {
+      "n_sampled": 5,
+      "labelled_unsupported": 3,
+      "edges_total": 68,
+      "edges_kept": 53
+    },
+    "CAUSED_BY": {
+      "n_sampled": 26,
+      "labelled_unsupported": 13,
+      "edges_total": 375,
+      "edges_kept": 296
+    },
+    "DEPENDS_ON": {
+      "n_sampled": 5,
+      "labelled_unsupported": 5,
+      "edges_total": 17,
+      "edges_kept": 5
+    },
+    "EXHIBITS": {
+      "n_sampled": 27,
+      "labelled_unsupported": 6,
+      "edges_total": 396,
+      "edges_kept": 368
+    },
+    "HAS_COMPONENT": {
+      "n_sampled": 15,
+      "labelled_unsupported": 6,
+      "edges_total": 219,
+      "edges_kept": 178
+    },
+    "INVOLVES": {
+      "n_sampled": 16,
+      "labelled_unsupported": 1,
+      "edges_total": 237,
+      "edges_kept": 217
+    },
+    "REQUIRES": {
+      "n_sampled": 5,
+      "labelled_unsupported": 3,
+      "edges_total": 72,
+      "edges_kept": 55
+    },
+    "RESOLVED_BY": {
+      "n_sampled": 71,
+      "labelled_unsupported": 14,
+      "edges_total": 1025,
+      "edges_kept": 811
+    },
+    "RUNS": {
+      "n_sampled": 5,
+      "labelled_unsupported": 1,
+      "edges_total": 60,
+      "edges_kept": 33
+    },
+    "SIGNALS": {
+      "n_sampled": 5,
+      "labelled_unsupported": 0,
+      "edges_total": 11,
+      "edges_kept": 6
+    }
+  },
+  "note": "rates are population-weighted over relation strata (stratified sample, seed 13); CIs are stratified bootstrap percentiles (2000 resamples).",
+  "labelers": [
+    "claude-opus-5-5"
+  ]
+}

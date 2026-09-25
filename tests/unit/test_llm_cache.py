@@ -49,3 +49,12 @@ def test_unicode_roundtrip(tmp_path: Path) -> None:
         client.complete(_req("Apple Watch Series 10 — ne s'appaire pas"))
         hit = client.complete(_req("Apple Watch Series 10 — ne s'appaire pas"))
     assert hit.text == "Réglages → Bluetooth ✓"
+
+
+def test_hit_and_miss_counters(tmp_path: Path) -> None:
+    with SQLiteCache(tmp_path / "c.sqlite") as cache:
+        client = CachedLLMClient(FakeLLMClient(responder=lambda r: "a"), cache)
+        client.complete(_req())
+        client.complete(_req())
+        client.complete(_req("other"))
+        assert client.stats() == {"hits": 1, "misses": 2, "hit_rate": 0.3333}

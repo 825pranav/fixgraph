@@ -239,7 +239,8 @@ def test_report_end_to_end(tmp_path: Path) -> None:
     assert spans["multi-article"]["S2"]["recall@8"] == 1.0
     multi = next(t for t in rep["multi_article_tests"] if t["metric"] == "correctness")
     assert multi["n"] == 3 and multi["diff"] == 1.0
-    assert rep["provenance"] == {"human_verified": 0, "auto_screen_passed": 0, "total": 7}
+    prov = {"verified": 0, "verified_by": {}, "auto_screen_passed": 0, "total": 7}
+    assert rep["provenance"] == prov
     md = render_markdown(rep)
     assert "| correctness |" in md and "| multi-article |" in md
     # Rows for questions outside the set (e.g. rejected in review) are ignored, not a KeyError.

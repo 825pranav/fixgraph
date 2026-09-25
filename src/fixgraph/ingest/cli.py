@@ -1,8 +1,8 @@
-"""`fixgraph ingest scrape | parse | chunk | subset`.
+"""`fixgraph ingest scrape | parse | chunk | subset | links`.
 
 scrape -> data/raw/html (ingest.scrape); parse + select -> articles.parquet (ingest.parse,
 ingest.select); chunk -> chunks.parquet (ingest.chunk); subset trims the corpus to a chunk
-budget. Used by: cli.py (mounted as `ingest`).
+budget; links -> links.parquet (ingest.links). Used by: cli.py (mounted as `ingest`).
 Uses: core.config, core.ontology, ingest.store.
 """
 
@@ -125,3 +125,22 @@ def subset(
         f"kept {len(kept)}/{len(articles)} articles, {len(kept_chunks)}/{len(chunks)} chunks "
         f"({len(must)} gold articles always kept)"
     )
+
+
+@app.command()
+def links() -> None:
+    """Hyperlinks between corpus articles, with the sentence and chunk they sit in (D34)."""
+    from fixgraph.ingest.links import attach_chunks, extract_links, write_links
+
+    paths = load_settings().paths
+    articles = read_articles(paths.articles)
+    ids = {a.article_id for a in articles}
+    found = []
+    for a in articles:
+        html = (paths.raw_html / f"{a.article_id}.html").read_text(encoding="utf-8")
+        found += extract_links(html, a.article_id, ids)
+    found = attach_chunks(found, read_chunks(paths.chunks))
+    out = paths.corpus / "links.parquet"
+    write_links(found, out)
+    in_chunks = sum(bool(x.src_chunk_id) for x in found)
+    typer.echo(f"{len(found)} links ({in_chunks} located in a chunk) -> {out}")

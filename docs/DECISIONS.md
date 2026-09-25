@@ -236,3 +236,149 @@ The report splits correctness and recall@8 by single- vs multi-article gold evid
 the paired permutation tests (Holm) on the multi-article subset alone, because that subset is
 where the research question lives. Judge-validation labels are sampled round-robin across
 systems so kappa is not dominated by one retriever.
+
+### D31: Model review in place of human verification
+The developer could not verify Apple troubleshooting questions with confidence, so the
+verification and judge-labeling steps were run by a stronger model (Claude Opus 5.5) than the
+generator and judge (qwen3), and recorded as such rather than as human work.
+- Questions: four reviewers applied one written rubric (answer stated in the gold chunks; for
+  multi_constraint the fix appears in each symptom's own article; for version_conditional the
+  requirement comes from the same article; for cross_device the dependency is stated).
+  Decisions and reasons go to `data/bench/generated_review.jsonl`; kept questions get
+  `verified_by: claude-opus-5-5`. Rejected questions stay in the file unverified instead of
+  being deleted, so the completed run still lines up with the question file; reports use
+  `--questions verified`. 6/6 spot-checked decisions matched the evidence.
+- Judge labels: two independent blind labelers each scored all 99 sampled answers with the
+  judge's rubric; their agreement (κ = 0.91) bounds how well a judge can be expected to agree,
+  and the 5 disagreements were adjudicated. Both raters' scores are kept.
+- Reports print who verified the questions (`Verified: 93/93 (by claude-opus-5-5)`) instead of
+  assuming a human did. A human pass remains the next step.
+
+## Strengthening the evaluation (2026-09-25)
+
+Protocols below were written before the runs they describe.
+
+### D32: Edge verification against the source sentence
+Validation (D13) only fuzzy-matches each entity string to the chunk, so an edge between two
+strings that merely co-occur passes. `fixgraph kg verify-edges` turns every LLM-extracted edge
+into a templated statement using the chunk's own surface forms and asks qwen3:8b, per source
+chunk (<= 12 statements per call), whether the passage states it, with an exact supporting
+quote; code requires the quote to occur in the passage the model saw (article title, section
+heading and chunk text; partial ratio >= 0.85). A 3-chunk smoke run showed correct claims
+quoted from the title failing a chunk-text-only check, so the check was widened before the
+full run and before any labels existed. An edge is kept if
+any source chunk supports it and its provenance is narrowed to those chunks. Failed calls fail
+closed. Ontology seed DEPENDS_ON edges (no source text) are dropped; IN_FAMILY (rule-derived
+from product names) is kept. The extraction prompt's `depends_on` few-shot example, a likely
+source of invented dependencies, is left unchanged: editing it without re-extracting would make
+the committed code disagree with the committed extractions. The verified graph is written to
+`data/kg_verified/`; nodes and mentions are unchanged.
+
+Measurement, fixed before running the verifier:
+- `fixgraph kg edge-sample` draws edges (seed 13, target 200), stratified by relation with
+  proportional allocation and a floor of 5 per relation; rounding and the floors give 209 edges
+  (235 edge-chunk statements).
+- Each sampled edge is labelled "at least one source chunk states it" by two independent blind
+  labelers (Claude Opus 5.5, `labeler: claude-opus-5-5`; not human) who see the statements and
+  full chunk text but not the verifier's output; disagreements are adjudicated and both raters'
+  labels are kept.
+- `fixgraph kg edge-eval` reports the hallucinated-edge rate (share of edges no source chunk
+  states) over all edges (before) and over kept edges (after), weighted by relation stratum
+  size, with stratified bootstrap 95% CIs, plus the verifier's precision/recall against the
+  labels. Output: `results/kg/edge_verification.json`. No threshold or prompt is changed after
+  seeing the labels.
+
+### D33: Judge calibration with a held-out split
+The qwen3:8b judge agreed with the blind reference labels at kappa = 0.38 (target 0.6), and was
+one step harsh on fully correct answers. Protocol, fixed before any variant was run:
+- Reference labels: the 99 blind labels from `data/bench/judge_labels_test.jsonl` (two Claude
+  Opus 5.5 raters, kappa 0.91 with each other, adjudicated). They are model labels, not human;
+  every claim says "agreement with model reference labels".
+- `fixgraph bench label-split` splits them once (seed 13, stratified by system): 1/3 dev for
+  designing prompts, 2/3 held out (`data/bench/judge_label_split_test.json`). The split refuses
+  to be redrawn.
+- Four variants declared in advance (bench/judge.py): v1 original; v2 tighter rubric (defines
+  "main solution", lists what must not lower a score); v3 v2 wording with the score derived in
+  code from main_solution yes/partly/no + a contradiction flag; v4 v2 + three worked examples,
+  the first dev item at each score level (excluded from v4's own dev score).
+- `fixgraph bench judge-calibrate --split dev` scores variants on dev; every run is appended to
+  `results/judge/calibration.json`. The variant with the highest dev weighted kappa is chosen
+  (ties -> the simpler variant, in the order v1 < v2 < v3 < v4). The chosen variant is scored on
+  the held-out split exactly once (the command refuses a second held-out run).
+- Known leak: the "one step harsh" pattern that motivated v2-v4 was seen on all 99 labels,
+  including the held-out items, before the split. The held-out kappa is therefore optimistic;
+  a second, untouched check is the fresh labels collected on the stage-4 benchmark (D35), which
+  no prompt was designed against.
+- If no variant reaches 0.6, qwen3:14b (partly CPU-offloaded, local) is tried with the chosen
+  prompt; if that also misses, the miss is reported. No API judge (the project stays local).
+- The chosen variant then re-judges the test run (`bench run --stages judge,report
+  --judge-variant vN`); cached answers and verifier calls are reused. `judge_meta.json` records
+  which prompt produced each run's scores.
+
+### D34: Document link layer (S2L) and fusion retriever (S4)
+Apple articles link to each other inside their instructions; `fixgraph ingest links` records
+every link from a content block to another corpus article, with its sentence and source chunk
+(`data/corpus/links.parquet`; 305 links, all inside working-set chunks). These links are written
+by Apple, not extracted, so they are not subject to the hallucination measured in D32.
+- S2L = S2 (PPR, same seeds, damping 0.5) over the entity graph plus a document layer: one node
+  per article, joined with weight 0.2 to every entity its chunks mention and with weight 0.8 to
+  every article it links to. An article node scores all its chunks. Weights are set a priori by
+  analogy (IN_FAMILY 0.2, DEPENDS_ON 0.8) and are not tuned on any benchmark. S2 without the
+  layer stays in every run as the ablation.
+- S4 = reciprocal-rank fusion (k = 60, equal weights) of the S1 hybrid candidate list (50) and
+  the S2L PPR chunk ranking (top 50), top 30 fused chunks reranked by the same cross-encoder;
+  without linked seeds it reduces to S1. Fixed before any run; not tuned.
+- Because the bridge benchmark (D35) is built from the same links, S2L and S4 see the bridge
+  structure and S1 does not (as with hyperlink-based retrievers on HotpotQA). This is stated
+  with every bridge result, and S2 (no links) shows how much of any gain the links carry.
+- All graph systems (S2, S2L, S3, S4) use the verified graph `data/kg_verified` from here on.
+
+### D35: Bridge benchmark: a fixed rule, frozen before any system runs
+Rule (bench/bridge.py), fixed before generation:
+1. Candidates: links whose sentence contains if / when / unless and that sit in a corpus chunk;
+   one per (source, target) article pair; at most 2 per source article (seeded shuffle, seed 13).
+2. qwen3:8b writes a matched pair per candidate from A's chunk and the first 3 chunks of C:
+   a bridge question (A's situation and condition; must not name the link) and a direct
+   question (asks about C's topic), one shared answer from C, and a verbatim quote from C.
+3. Mechanical checks, no LLM: the quote must occur in one of C's chunks (partial ratio >= 0.85;
+   that chunk is the gold C chunk); the bridge question may contain no content word of the
+   anchor except generic link words and words of A's title; answer-word overlap < 0.6.
+4. Review (Claude Opus 5.5, `verified_by: claude-opus-5-5`, not human) checks that the answer
+   is stated in C, that the bridge question is a natural question in A's situation that C
+   answers without naming the link, and that the direct question asks for the same thing.
+   Pairs are kept or dropped as a unit. Nothing is filtered on any system's retrieval or
+   answers, and the rule is not revised after generation. If fewer pairs survive than hoped,
+   the smaller n is reported.
+5. `fixgraph bench bridge-freeze` records the file's SHA-256 before the first retrieval run;
+   `bridge-generate` refuses to run after freezing.
+Analysis, fixed now:
+- Systems S0, S1, S2, S2L, S3, S4 on the verified graph; judge = the variant chosen in D33.
+- Primary retrieval metric: answer-chunk hit@8 (the gold C chunk in the top 8), reported for
+  bridge and direct questions separately, with bootstrap CIs; paired permutation tests vs S1,
+  Holm-corrected across the five comparisons, per question type.
+- Hop cost per system = hit@8(direct) - hit@8(bridge) over pairs; the crossover test compares
+  each system's hop cost with S1's (paired over pairs, Holm-corrected).
+- Correctness (judge) reported the same way. A fresh blind sample of 60 bridge-run answers
+  (balanced across systems, two Claude raters) gives the untouched judge-agreement check (D33).
+
+### D36: Serving measurements
+`CachedLLMClient` counts hits/misses; `/health` reports the hit rate. `scripts/loadtest.py`
+sends the frozen benchmark questions to /retrieve and /answer (async httpx) at concurrency
+1 / 4 / 16, 60 requests per cell, and records p50/p95 latency, throughput, errors and the
+cell's cache hit rate (difference of the server's counters) to `results/serving/loadtest.json`.
+The first /answer pass after a server start on an empty response cache is labelled cold;
+repeats are warm. Numbers come from the same laptop that serves the model, so they measure the
+single-box setup, not a scaled deployment.
+- Amendment (before any question was generated): step 2 is done by Claude Opus 5.5 instead of
+  qwen3:8b, from the same inputs (A's chunk, the link sentence and anchor, C's first 3 chunks)
+  and the same instructions; questions carry `source: bridge-claude`. Reason: qwen3:8b wrote
+  weaker questions in D27-D29 and ties up the GPU for about an hour. The mechanical checks of
+  step 3 are unchanged and run in code (`fixgraph bench bridge-import`). The step-4 review is
+  done by a separate Claude instance that did not write the questions. Claude does not judge
+  answers or verify edges anywhere, so no Claude output is scored against other Claude output.
+- Bug fix to the step-3 anchor check (before any system ran, and independent of any system's
+  output): it counted function words ("but", "all", "after", "while", "two") and device/OS
+  names ("macOS") as link concepts, contrary to the rule's "content word" wording, and rejected
+  11 pairs for them (b002 b008 b035 b041 b077 b080 b094 b095 b098 b106 b108). The generic list
+  was extended with function words and topic words (the same device/app list the answer-leak
+  check uses) are ignored. `results/bridge/generation.json` records the final rejections.

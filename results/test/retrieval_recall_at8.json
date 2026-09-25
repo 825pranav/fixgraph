@@ -1,5 +1,5 @@
 {
- "note": "per-question recall@8 vs gold chunks; questions in data/bench/generated.jsonl (unverified; see screen field)",
+ "note": "per-question recall@8 vs gold chunks; questions in data/bench/generated.jsonl (verified flag and verified_by per question; review decisions in data/bench/generated_review.jsonl)",
  "recall@8": {
   "S1": {
    "t032": 1.0,

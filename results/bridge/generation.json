@@ -1,0 +1,19 @@
+{
+  "generator": "claude-opus-5-5 (D35 amendment)",
+  "candidates": 111,
+  "pairs_passed_checks": 108,
+  "rejections": [
+    {
+      "pid": "b050",
+      "reason": "writer skipped: Target C only lists backup method links (iCloud, Mac, PC) with no actual steps or facts that would answer how to create an iCloud backup."
+    },
+    {
+      "pid": "b094",
+      "reason": "bridge question names the link: ['bar']"
+    },
+    {
+      "pid": "b097",
+      "reason": "writer skipped: Link sentence refers to updating with a Mac running macOS Catalina or later (Finder), but target C covers updating with iTunes on macOS Mojave or earlier/Windows; C only says to use the Finder instead, with no steps, so it doesn't answer the situation."
+    }
+  ]
+}
