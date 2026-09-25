@@ -52,9 +52,39 @@ that benchmark plus human verification is the next step. Grounding works across 
 ~80–87% of citations point at gold evidence and the verifier finds 8% unsupported claims.
 Abstention is weak for a 4B model: 2 of 3 unanswerable questions were answered anyway.
 
+### Test benchmark: multi-article questions (retrieval, 2026-09-25)
+
+> **Status:** 191 questions generated from KG paths (D27–D29); 112 pass the automatic
+> pre-screen, **none human-verified yet**. Retrieval and answering are complete; the judging
+> stage was interrupted (the machine ran low on memory at 215/764 judgements), so answer
+> correctness is not reported yet. The retrieval numbers below need no judge.
+
+recall@8 of gold evidence chunks (S1 hybrid RAG, S2 PPR GraphRAG, S3 typed paths); p = paired
+permutation test vs S1, not multiple-comparison corrected. Per-question values: `results/test/retrieval_recall_at8.json`.
+
+| questions | n | S1 | S2 | S3 | p (S2 / S3 vs S1) |
+|---|---|---|---|---|---|
+| all generated | 191 | 0.81 | 0.77 | 0.71 | 0.115 / 0.001 |
+| auto-screen passed | 112 | **0.88** | 0.80 | 0.76 | 0.017 / 0.003 |
+| screened, multi-article | 76 | **0.82** | 0.72 | 0.69 | 0.033 / 0.015 |
+| screened, single-article | 36 | 1.00 | 0.97 | 0.92 | 1.000 / 0.246 |
+| screened, multi_constraint | 54 | **0.88** | 0.73 | 0.75 | 0.009 / 0.038 |
+| screened, cross_device | 15 | 0.66 | **0.76** | 0.52 | 0.254 / 0.187 |
+| screened, version_conditional | 9 | 0.72 | 0.67 | 0.72 | 1.000 / 1.000 |
+
+**What this says so far.** Multi-article questions take hybrid RAG off the ceiling (1.00 → 0.82),
+so the benchmark can now separate systems, and graph retrieval still does not beat it: on
+screened multi-article questions both graph systems retrieve significantly less gold evidence.
+Entity linking is not the bottleneck (74% of gold seed nodes are linked, no fallbacks): the
+questions name both symptoms, so dense + BM25 already find both articles. A likely (untested)
+reason PPR does worse is that its mass spreads over the shared fix node's many neighbours. The one type where PPR leads is cross_device (following
+a DEPENDS_ON edge), but n = 15 is too small to call. These numbers may move after human
+verification.
+
 ### Knowledge graph
 
-qwen3:4b, prompt v2, 500 chunks, 4.9 s/chunk, 0 failed chunks.
+qwen3:4b, prompt v2, 500 chunks, 4.9 s/chunk wall-clock (2 concurrent requests, ~9 s each),
+0 failed chunks.
 **2,201 nodes, 2,926 extracted edges, 100% with provenance**, 94.9% of symptoms have ≥ 1 fix;
 largest connected component 1,785 nodes.
 
@@ -97,14 +127,17 @@ documented in a different article.
 | M1 corpus: 1,915 scraped, 1,000 selected, deterministic chunking | done (500-chunk working set) |
 | M2 knowledge graph, validation, resolution, quality report | done; gold set pending human review |
 | M3 hybrid RAG, grounded answers, verifier, stats harness | done |
-| M4 GraphRAG (PPR, typed paths), entity linking | done; linking accuracy pending generated questions |
-| M5 benchmark: generation + verification tooling | tooling done; ≥150 verified questions and judge κ pending |
+| M4 GraphRAG (PPR, typed paths), entity linking | done |
+| M5 benchmark: generation, auto-screen, verification | 191 test questions generated (112 pass the auto-screen); retrieval + answers done, judging interrupted; human verification and judge κ pending |
 | M6 GNN: baselines, hetero-SAGE, gap report | done (S4 routing not run) |
 | M7 FastAPI, Docker (CI-built), write-up | done |
 
-Next steps: review gold annotations (`fixgraph kg annotate`), generate and verify multi-article
-questions (`fixgraph bench generate`, `fixgraph bench verify`), rerun the benchmark on them, and
-label ~80 answers to validate the judge.
+Next steps (human review; no GPU needed, see [Human review](#human-review)): verify the
+generated test questions, label ~80 answers to validate the judge, review the 50 gold
+extraction chunks. Then finish judging the test run (GPU, ~2.5 h; cached calls are replayed):
+`fixgraph bench run --questions-file data/bench/generated.jsonl --run-name test --stages judge,report`.
+The run covers all 191 questions, so the verified-only report is one `fixgraph bench report`
+command.
 
 ## Repository layout
 
@@ -116,7 +149,8 @@ src/fixgraph/
   kg/          extraction schema + prompt, validation, resolution, parquet store, quality eval
   retrieval/   BM25, Qdrant index, hybrid RAG, entity linking, PPR, typed paths
   answer/      grounded generation, claim verifier
-  bench/       questions, runner, judge, metrics, statistics, generation/verification
+  bench/       questions, path-based generation, auto-screen, human verification, runner,
+               judge, metrics, statistics, judge validation
   gnn/         HeteroData export, splits, baselines, hetero GraphSAGE, evaluation
   api/         FastAPI service
 configs/       base.yaml, ontology.yaml
@@ -126,19 +160,25 @@ data/gold, data/bench   committed annotations and questions (no raw article text
 
 ## Limitations
 
-- **Unverified evaluation data.** The 30 dev questions, their gold chunks and the 50-chunk
-  extraction gold set were drafted by an AI assistant; they are marked `verified: false` /
+- **Unverified evaluation data.** The 30 dev questions and the 50-chunk extraction gold set
+  were drafted by an AI assistant; the 191 test questions were generated by qwen3:8b from KG
+  paths and checked only by the automatic screen. All are marked `verified: false` /
   `status: draft` until reviewed with `fixgraph bench verify` and `fixgraph kg annotate`.
 - **No judge validation yet.** The qwen3:8b judge has not been compared with human labels
   (target: κ ≥ 0.6 on 80–100 answers). The blind labeling tool is in place:
   `fixgraph bench label` (keys 1 / 5 / 0 per answer, system name hidden) and
   `fixgraph bench kappa` report Cohen's κ and exact agreement against the judge.
-- **Small, easy benchmark.** 30 questions give wide CIs; single-article questions put hybrid
-  RAG at the recall ceiling, so the benchmark cannot yet show where graphs should help.
+- **Auto-screen is not verification.** The screen checks answer leaks and support
+  mechanically, but it is still an LLM pass; a manual read of the generated set finds
+  questions that pass it and are still odd.
+- **Entity resolution over-merges generic fixes.** Fix nodes such as "Restart your Mac" are
+  merged across articles, so a requirement from one article ("macOS 14.1") attaches to
+  unrelated symptoms. Several generated `version_conditional` questions inherit this error;
+  the benchmark exposed it, and human review is where they get rejected.
 - **Time-boxed corpus.** 500 of 2,531 chunks (whole articles, highest troubleshooting
   relevance); the pipeline runs unchanged on the full corpus.
-- **Not run:** 4B vs 8B extraction comparison, path-generated multi-hop benchmark, S4 (GNN
-  routing), ablations. All are implemented as commands; see `docs/DECISIONS.md` D20–D26.
+- **Not run:** 4B vs 8B extraction comparison, S4 (GNN routing), ablations. All are
+  implemented as commands; see `docs/DECISIONS.md` D20–D30.
 - Data: public support articles, fetched politely (robots.txt, ≤ 1 req/s); raw text is not
   redistributed. This is an independent student project, not affiliated with Apple.
 
@@ -188,6 +228,7 @@ uv sync
 uv run poe gpu                        # CUDA available: True + GPU name
 ollama pull qwen3:4b; ollama pull qwen3:8b
 uv run poe check                      # ruff + pyright + unit tests
+                                      # (path with a space? uv run python -m poethepoet check)
 uv run fixgraph ingest scrape         # ~35 min, polite, cached
 uv run fixgraph ingest parse; uv run fixgraph ingest chunk
 uv run fixgraph ingest subset --max-chunks 500   # time-boxed working corpus
@@ -196,6 +237,34 @@ bash scripts/run_pipeline.sh          # KG -> eval -> GNN -> index -> benchmark
 uv run fixgraph serve                 # FastAPI on :8000
 ```
 
-Human-in-the-loop steps: `fixgraph kg annotate` (gold extraction set), `fixgraph bench verify`
-(benchmark questions). See `DATA.md` for data provenance and `docs/DECISIONS.md` for every
-design decision.
+Test benchmark (multi-article questions, ~4 h on the RTX 4050):
+
+```powershell
+uv run fixgraph bench generate        # 191 questions from KG paths (qwen3:8b)
+uv run fixgraph bench screen          # automatic pre-screen, advisory only
+uv run fixgraph bench run --questions-file data/bench/generated.jsonl --run-name test
+```
+
+See `DATA.md` for data provenance and `docs/DECISIONS.md` for every design decision.
+
+## Human review
+
+Three steps need a person; none needs the GPU. Each saves after every keystroke, so you can
+stop and resume.
+
+```powershell
+# 1. Verify test questions (y = keep, n = reject, s = skip, q = quit). Screen-passed,
+#    multi-article questions come first.
+uv run fixgraph bench verify --reviewer <name>
+uv run fixgraph bench report --run-name test --questions-file data/bench/generated.jsonl --questions verified
+
+# 2. Validate the judge: ~80 blind labels (1 = correct, 5 = partial, 0 = wrong), balanced
+#    across systems, then Cohen's kappa against the qwen3:8b judge (target >= 0.6).
+uv run fixgraph bench label --run-name test --questions-file data/bench/generated.jsonl --questions verified --labeler <name>
+uv run fixgraph bench kappa --run-name test
+
+# 3. Review the 50 draft gold extraction chunks (a = accept, e = edit in Notepad), then score
+#    extraction against reviewed gold only.
+uv run fixgraph kg annotate --reviewer <name>
+uv run fixgraph kg eval --status reviewed --out results/kg/extraction_eval_reviewed_gold.json
+```
