@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FixGraph</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #1b1f24; --muted: #5d6673; --line: #dfe3e8;
+    --accent: #2f6fde; --accent-soft: #e8f0fd; --ok: #1f8a4c; --warn: #b26a00; --bad: #c0362c;
+    --cite: #fff4d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111418; --panel: #1a1f25; --ink: #e6e9ed; --muted: #9aa4b1; --line: #2c333c;
+      --accent: #6ea0ff; --accent-soft: #1d2b44; --ok: #4cc283; --warn: #e3a547; --bad: #ef6f64;
+      --cite: #3a3220;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header { padding: 18px 24px 0; max-width: 1100px; margin: 0 auto; }
+  h1 { margin: 0; font-size: 22px; }
+  h1 small { font-weight: 400; color: var(--muted); font-size: 14px; margin-left: 8px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+  .pill { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: 13px;
+          background: var(--panel); }
+  .pill.ok { color: var(--ok); } .pill.warn { color: var(--warn); } .pill.bad { color: var(--bad); }
+  nav { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+  nav button { border: 0; background: none; padding: 8px 14px; font: inherit; color: var(--muted);
+               cursor: pointer; border-bottom: 2px solid transparent; }
+  nav button.on { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+  main { max-width: 1100px; margin: 0 auto; padding: 18px 24px 48px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+          padding: 16px; margin-bottom: 14px; }
+  textarea { width: 100%; min-height: 64px; font: inherit; padding: 10px; border-radius: 8px;
+             border: 1px solid var(--line); background: var(--bg); color: var(--ink); resize: vertical; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; }
+  select, input[type=number] { font: inherit; padding: 6px 8px; border-radius: 6px;
+             border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  input[type=number] { width: 64px; }
+  .btn { font: inherit; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--accent);
+         background: var(--accent); color: #fff; cursor: pointer; }
+  .btn.ghost { background: transparent; color: var(--accent); }
+  .btn:disabled { opacity: .5; cursor: wait; }
+  .examples { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .examples button { font: inherit; font-size: 13px; border: 1px solid var(--line); border-radius: 999px;
+                     background: var(--bg); color: var(--ink); padding: 3px 10px; cursor: pointer; }
+  .examples button:hover { border-color: var(--accent); }
+  .label { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+           margin: 0 0 8px; }
+  .answer p { margin: 0 0 6px; }
+  .cite { display: inline-block; font-size: 12px; background: var(--accent-soft); color: var(--accent);
+          border-radius: 4px; padding: 0 5px; margin-left: 3px; cursor: pointer; font-family: ui-monospace, monospace; }
+  .abstain { color: var(--warn); }
+  .timings { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); }
+  .timings b { color: var(--ink); font-weight: 600; }
+  .chunk { border-top: 1px solid var(--line); padding: 10px 0; }
+  .chunk:first-child { border-top: 0; }
+  .chunk.cited { background: var(--cite); margin: 0 -16px; padding: 10px 16px; }
+  .chunk .meta { display: flex; gap: 10px; font-size: 13px; color: var(--muted); align-items: baseline; }
+  .chunk .id { font-family: ui-monospace, monospace; color: var(--ink); }
+  .chunk .text { white-space: pre-wrap; margin-top: 4px; font-size: 14px; }
+  .chunk .text.clip { max-height: 4.6em; overflow: hidden; cursor: pointer; }
+  .err { color: var(--bad); white-space: pre-wrap; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  tr.best td { font-weight: 600; }
+  .note { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; align-items: start; }
+  .bars div { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 3px 0; }
+  .bars span:first-child { width: 120px; color: var(--muted); }
+  .bars i { display: block; height: 10px; background: var(--accent); border-radius: 3px; }
+  .hidden { display: none; }
+  @media (max-width: 600px) { header, main { padding-left: 16px; padding-right: 16px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>FixGraph <small>local troubleshooting assistant over Apple support articles</small></h1>
+  <div class="pills" id="pills"><span class="pill">checking service…</span></div>
+  <nav>
+    <button class="on" data-tab="ask">Ask</button>
+    <button data-tab="bench">Benchmarks</button>
+  </nav>
+</header>
+
+<main>
+  <section id="ask">
+    <div class="card">
+      <p class="label">Question</p>
+      <textarea id="q" placeholder="e.g. My AirPods won't charge. What should I do?"></textarea>
+      <div class="row">
+        <label>System <select id="system"></select></label>
+        <label>k <input id="k" type="number" min="1" max="50" value="8"></label>
+        <button class="btn" id="answerBtn">Answer</button>
+        <button class="btn ghost" id="retrieveBtn">Retrieve only</button>
+      </div>
+      <div class="examples" id="examples"></div>
+    </div>
+    <div id="out"></div>
+  </section>
+
+  <section id="bench" class="hidden"><div id="benchOut"><p class="note">Loading…</p></div></section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const SYSTEM_NAMES = {
+  S0: "S0 · closed book (no retrieval)", S1: "S1 · hybrid: dense + BM25 + reranker",
+  S2: "S2 · graph: Personalized PageRank", S2L: "S2L · PageRank + Apple's article links",
+  S3: "S3 · graph: typed paths", S4: "S4 · fusion of S1 and S2L",
+  lexical: "lexical · word overlap (fallback)",
+};
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt = (x, d = 2) => (x === null || x === undefined) ? "–" : Number(x).toFixed(d);
+
+async function api(path, body) {
+  const res = await fetch(path, body === undefined ? {} :
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail ? JSON.stringify(data.detail) : `HTTP ${res.status}`);
+  return data;
+}
+
+// Tabs
+document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("on", x === b));
+  ["ask", "bench"].forEach((t) => $(t).classList.toggle("hidden", t !== b.dataset.tab));
+});
+
+// Status pills from /health, and the system dropdown.
+async function loadHealth() {
+  try {
+    const h = await api("/health");
+    const pill = (text, cls = "") => `<span class="pill ${cls}">${esc(text)}</span>`;
+    $("pills").innerHTML = [
+      pill(h.mode === "real" ? "real mode" : "fake mode (demo data, fake LLM)", h.mode === "real" ? "ok" : "warn"),
+      pill(`${h.chunks} chunks`),
+      pill(h.qdrant_readable ? "hybrid index ready" : "no hybrid index", h.qdrant_readable ? "ok" : "warn"),
+      pill(h.llm_reachable ? "LLM reachable" : "LLM unreachable (answers fail, retrieval works)", h.llm_reachable ? "ok" : "bad"),
+      pill(h.kg_loaded ? "knowledge graph loaded" : "no knowledge graph on disk", h.kg_loaded ? "ok" : ""),
+    ].join("");
+    const pref = h.systems.includes("S1") ? "S1" : h.systems[0];
+    $("system").innerHTML = h.systems.map((s) =>
+      `<option value="${s}" ${s === pref ? "selected" : ""}>${esc(SYSTEM_NAMES[s] || s)}</option>`).join("");
+  } catch (e) {
+    $("pills").innerHTML = `<span class="pill bad">service unreachable: ${esc(e.message)}</span>`;
+  }
+}
+
+async function loadExamples() {
+  const qs = await api("/demo/questions").catch(() => []);
+  $("examples").innerHTML = qs.slice(0, 12).map((q) => `<button>${esc(q)}</button>`).join("");
+  $("examples").querySelectorAll("button").forEach((b) => b.onclick = () => { $("q").value = b.textContent; });
+}
+
+// Ask: call /answer or /retrieve, then fetch the text of every returned chunk.
+async function run(mode) {
+  const question = $("q").value.trim();
+  if (!question) return;
+  const body = { question, system: $("system").value, k: Number($("k").value) || 8 };
+  $("answerBtn").disabled = $("retrieveBtn").disabled = true;
+  $("out").innerHTML = `<div class="card"><p class="note">${mode === "answer"
+    ? "Retrieving and generating… (the first S1 query loads the embedding and reranker models)"
+    : "Retrieving…"}</p></div>`;
+  const t0 = performance.now();
+  try {
+    const r = await api(mode === "answer" ? "/answer" : "/retrieve", body);
+    const wall = (performance.now() - t0) / 1000;
+    const ids = r.chunk_ids;
+    const texts = ids.length ? await api("/chunks", ids) : {};
+    render(r, texts, wall, mode);
+  } catch (e) {
+    $("out").innerHTML = `<div class="card err">Request failed: ${esc(e.message)}</div>`;
+  } finally {
+    $("answerBtn").disabled = $("retrieveBtn").disabled = false;
+  }
+}
+
+function render(r, texts, wall, mode) {
+  const cited = new Set(r.citations || []);
+  let html = "";
+  if (mode === "answer") {
+    const body = r.abstained
+      ? `<p class="abstain">Abstained: the retrieved passages do not support an answer.</p>`
+      : r.sentences.map((s) => `<p>${esc(s.text)}${s.citations.map((c) =>
+          `<span class="cite" data-c="${esc(c)}">${esc(c)}</span>`).join("")}</p>`).join("");
+    html += `<div class="card answer"><p class="label">Answer (${esc(r.system)})</p>${body}</div>`;
+  }
+  const timings = Object.entries(r.timings || {}).map(([k, v]) => `${esc(k)} <b>${fmt(v)}</b>`);
+  timings.push(`wall clock <b>${fmt(wall)} s</b>`);
+  html += `<div class="card"><div class="timings">${timings.join("")}</div></div>`;
+
+  const scores = r.scores || [];
+  const shown = r.chunk_ids;
+  html += `<div class="card"><p class="label">Evidence: ${shown.length} retrieved chunks${
+    mode === "answer" ? " (highlighted = cited in the answer)" : ""}</p>` +
+    (shown.length ? shown.map((id, i) => `
+      <div class="chunk ${cited.has(id) ? "cited" : ""}" id="chunk-${esc(id)}">
+        <div class="meta"><span>#${i + 1}</span><span class="id">${esc(id)}</span>${
+          scores[i] !== undefined ? `<span>score ${fmt(scores[i], 3)}</span>` : ""}${
+          cited.has(id) ? "<span>cited</span>" : ""}</div>
+        <div class="text clip" title="click to expand">${esc(texts[id] || "(text not available)")}</div>
+      </div>`).join("") : `<p class="note">No passages (S0 answers closed book).</p>`) + `</div>`;
+  $("out").innerHTML = html;
+  $("out").querySelectorAll(".text.clip").forEach((t) => t.onclick = () => t.classList.toggle("clip"));
+  $("out").querySelectorAll(".cite").forEach((c) => c.onclick = () => {
+    const el = document.getElementById("chunk-" + c.dataset.c);
+    if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.querySelector(".text").classList.remove("clip"); }
+  });
+}
+
+$("answerBtn").onclick = () => run("answer");
+$("retrieveBtn").onclick = () => run("retrieve");
+$("q").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) run("answer"); });
+
+// Benchmarks tab: committed results, rendered as small tables.
+async function loadBench() {
+  let s;
+  try { s = await api("/results/summary"); } catch (e) {
+    $("benchOut").innerHTML = `<div class="card err">${esc(e.message)}</div>`; return;
+  }
+  if (!Object.keys(s).length) {
+    $("benchOut").innerHTML = `<div class="card note">No results/ folder found next to the code.</div>`; return;
+  }
+  const best = (rows, key) => Math.max(...rows.map((r) => r[key] ?? -1));
+  let html = "";
+  if (s.answers) {
+    const rows = Object.entries(s.answers.systems).map(([k, v]) => ({ k, ...v }));
+    const b = best(rows, "correctness");
+    html += `<div class="card"><p class="label">Answer quality · ${s.answers.n} reviewed multi-article questions</p>
+      <table><tr><th>System</th><th>Correctness</th><th>Key-fact recall</th><th>Recall@8</th><th>Unsupported claims</th><th>Latency p50 (s)</th></tr>
+      ${rows.map((r) => `<tr class="${r.correctness === b ? "best" : ""}"><td>${esc(SYSTEM_NAMES[r.k] || r.k)}</td>
+        <td>${fmt(r.correctness)}</td><td>${fmt(r.key_fact_recall)}</td><td>${r.k === "S0" ? "–" : fmt(r["recall@8"])}</td>
+        <td>${fmt(r.unsupported_rate)}</td><td>${fmt(r.latency_p50_s, 1)}</td></tr>`).join("")}</table>
+      <p class="note">Same answer model, prompt and context budget for every system; only retrieval differs. Hybrid retrieval (S1) leads, and the graph retrievers do not beat it.</p></div>`;
+  }
+  if (s.bridge) {
+    const rows = Object.entries(s.bridge.systems).map(([k, v]) => ({ k, ...v }));
+    html += `<div class="card"><p class="label">Multi-hop bridge questions · ${s.bridge.n} pairs · answer-chunk hit@8</p>
+      <table><tr><th>System</th><th>Bridge (answer behind an unnamed link)</th><th>Direct</th></tr>
+      ${rows.map((r) => `<tr class="${r.k === "S1" ? "best" : ""}"><td>${esc(SYSTEM_NAMES[r.k] || r.k)}</td><td>${fmt(r.bridge)}</td><td>${fmt(r.direct)}</td></tr>`).join("")}</table>
+      <p class="note">Each bridge question describes a situation whose answer sits in a different, unnamed article; its direct twin asks for that answer outright.</p></div>`;
+  }
+  html += `<div class="grid">`;
+  if (s.rerank) {
+    html += `<div class="card"><p class="label">Reranking study · locked test, ${s.rerank.n} questions · recall@8</p>
+      <table><tr><th>Config</th><th>All</th><th>Main</th></tr>
+      ${Object.entries(s.rerank.configs).map(([k, v]) => `<tr><td>${esc(k)}${k === s.rerank.baseline ? " (default)" : ""}</td>
+        <td>${fmt(v.all, 3)}</td><td>${fmt(v.main, 3)}</td></tr>`).join("")}</table>
+      <p class="note">The Qwen3 + bge blend gains +0.018 but is not significant (p_Holm = 0.25) and is ~2.8× slower, so it stays opt-in.</p></div>`;
+  }
+  if (s.kg) {
+    const bars = (obj) => {
+      const max = Math.max(...Object.values(obj));
+      return `<div class="bars">${Object.entries(obj).map(([k, v]) =>
+        `<div><span>${esc(k)}</span><i style="width:${Math.max(2, 140 * v / max)}px"></i><span>${v}</span></div>`).join("")}</div>`;
+    };
+    html += `<div class="card"><p class="label">Knowledge graph · ${s.kg.nodes} nodes · ${s.kg.edges_extracted} edges</p>
+      ${bars(s.kg.nodes_by_label)}<p class="label" style="margin-top:12px">Edges by relation</p>${bars(s.kg.edges_by_rel)}</div>`;
+  }
+  html += `</div>`;
+  $("benchOut").innerHTML = html;
+}
+
+// Bookmarkable states for demos: #bench opens the Benchmarks tab, ?q=...&run=retrieve|answer
+// fills the question and runs it once the system list has loaded.
+const params = new URLSearchParams(location.search);
+if (location.hash === "#bench") document.querySelector('nav button[data-tab="bench"]').click();
+if (params.get("q")) $("q").value = params.get("q");
+loadHealth().then(() => {
+  if (params.get("system")) $("system").value = params.get("system");
+  if (params.get("q") && params.get("run")) run(params.get("run") === "retrieve" ? "retrieve" : "answer");
+});
+loadExamples();
+loadBench();
+</script>
+</body>
+</html>

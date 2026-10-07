@@ -107,3 +107,15 @@ def test_suggestions_empty_without_file(client: TestClient) -> None:
     r = client.get("/links/suggestions", params={"symptom_id": "symptom:x"})
     assert r.status_code == 200 and r.json() == []
     assert client.get("/graph/entity/x").status_code == 404
+
+
+def test_dashboard_and_its_endpoints(client: TestClient) -> None:
+    page = client.get("/")
+    assert page.status_code == 200 and "<title>FixGraph</title>" in page.text
+    texts = client.post("/chunks", json=["demo:1:0", "missing"]).json()
+    assert texts["demo:1:0"].startswith("If your AirPods") and texts["missing"] is None
+    assert client.get("/demo/questions").json()[0] == "How do I fix AirPods that won't charge?"
+    summary = client.get("/results/summary").json()
+    assert summary["answers"]["n"] == 93 and summary["kg"]["nodes"] == 2201
+    # NaN metrics (no citations for closed book) must come back as null, not break the JSON.
+    assert summary["answers"]["systems"]["S0"]["unsupported_rate"] is None

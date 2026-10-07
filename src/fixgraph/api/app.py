@@ -7,7 +7,8 @@ Two modes:
   and a fake LLM that cites its first source, so the container runs with no GPU, data or keys.
 
 Endpoints: /health (with LLM-cache hit rate), /retrieve, /answer, /graph/entity/{id},
-/graph/subgraph, /links/suggestions (GNN gap candidates, always flagged `predicted`).
+/graph/subgraph, /links/suggestions (GNN gap candidates, always flagged `predicted`), and for the
+demo dashboard at / : /chunks (chunk text), /demo/questions and /results/summary.
 Used by: `fixgraph serve` (cli.py) via `create_app`.
 Uses: answer.grounded, retrieval (hybrid, index, rerank, bm25), kg.store, ingest.store,
 llm.factory, core.config.
@@ -26,10 +27,12 @@ from typing import Any
 import httpx
 import polars as pl
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from fixgraph.answer.grounded import AnswerOutput, AnswerSentence, answer_question
 from fixgraph.core.config import Settings, load_settings
+from fixgraph.core.paths import REPO_ROOT
 from fixgraph.kg.store import KG, read_kg
 from fixgraph.llm.base import LLMClient, LLMRequest
 from fixgraph.llm.cache import CachedLLMClient
@@ -54,6 +57,11 @@ DEMO_CHUNKS: dict[str, str] = {
 
 # Matches "[chunk_id]" header lines in the prompt; the fake model uses it to find a source to cite.
 _SOURCE_ID_RE = re.compile(r"^\[([^\]\n]+)\]$", re.MULTILINE)
+
+# The single-page dashboard served at /, and the committed results and questions it reads.
+DASHBOARD_HTML = Path(__file__).with_name("dashboard.html")
+RESULTS_DIR = REPO_ROOT / "results"
+DEV_QUESTIONS = REPO_ROOT / "data" / "bench" / "dev_handwritten.jsonl"
 
 
 # Simple word-overlap retriever: used as S1 in fake mode and as a "lexical" fallback system.
@@ -263,6 +271,72 @@ def _edges_touching(kg: KG, node_ids: list[str]) -> list[dict[str, Any]]:
     ).to_dicts()
 
 
+# Read a committed results file, or None when it is missing (e.g. inside the Docker image).
+def _read_result(rel: str) -> dict[str, Any] | None:
+    path = RESULTS_DIR / rel
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+
+
+# A metric's mean as a plain float; NaN (metric not defined for a system) becomes None.
+def _mean(cell: dict[str, Any]) -> float | None:
+    m = cell.get("mean")
+    return None if m is None or m != m else float(m)
+
+
+# The headline numbers the dashboard's Benchmarks tab shows, pulled from the committed results.
+def results_summary() -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    # Answer quality per system on the 93 reviewed multi-article questions.
+    if (test := _read_result("test/report_verified.json")) is not None:
+        metrics = [
+            "correctness",
+            "key_fact_recall",
+            "recall@8",
+            "unsupported_rate",
+            "latency_p50_s",
+        ]
+        out["answers"] = {
+            "n": test["n_questions"],
+            "systems": {
+                s: {m: _mean(row[m]) for m in metrics if m in row}
+                for s, row in test["table"].items()
+            },
+        }
+    # Multi-hop bridge questions vs their direct twins: answer-chunk hit@8 per system.
+    if (bridge := _read_result("bridge/bridge_report.json")) is not None:
+        hit = bridge["answer_chunk_hit@8"]
+        out["bridge"] = {
+            "n": bridge["n_pairs"],
+            "systems": {
+                s: {
+                    "bridge": _mean(hit["bridge"]["mean"][s]),
+                    "direct": _mean(hit["direct"]["mean"][s]),
+                }
+                for s in hit["bridge"]["mean"]
+            },
+        }
+    # Reranking study on the locked split: recall@8 for every finalist configuration.
+    if (rerank := _read_result("rerank/test_report.json")) is not None:
+        out["rerank"] = {
+            "n": rerank["n_questions"],
+            "baseline": rerank["baseline"],
+            "configs": {
+                name: {
+                    "all": _mean(row["recall@8"]),
+                    "main": _mean(rerank["table"]["main"][name]["recall@8"]),
+                }
+                for name, row in rerank["table"]["all"].items()
+            },
+        }
+    # Knowledge graph size and shape.
+    if (kg := _read_result("kg/stats.json")) is not None:
+        out["kg"] = {
+            k: kg[k] for k in ("nodes", "edges_extracted", "nodes_by_label", "edges_by_rel")
+        }
+    return out
+
+
+# Build the FastAPI app and register every endpoint as a closure over one ServiceState.
 def create_app(state: ServiceState | None = None) -> FastAPI:
     app = FastAPI(title="FixGraph", version="0.1.0")
     st = state or default_state()
@@ -364,5 +438,28 @@ def create_app(state: ServiceState | None = None) -> FastAPI:
             if row.get("symptom_id") == symptom_id:
                 out.append({**row, "origin": "predicted"})
         return out
+
+    # GET /: the demo dashboard, one static page that calls the endpoints below and above.
+    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+    def dashboard() -> str:
+        return DASHBOARD_HTML.read_text(encoding="utf-8")
+
+    # POST /chunks: the text of each requested chunk id, so the dashboard can show the evidence.
+    @app.post("/chunks")
+    def chunks(ids: list[str]) -> dict[str, str | None]:
+        return {cid: st.chunk_text.get(cid) for cid in ids[:50]}
+
+    # GET /demo/questions: the hand-written dev questions, offered as one-click examples.
+    @app.get("/demo/questions")
+    def demo_questions() -> list[str]:
+        if not DEV_QUESTIONS.exists():
+            return []
+        rows = DEV_QUESTIONS.read_text(encoding="utf-8").splitlines()
+        return [json.loads(r)["question"] for r in rows if r.strip()]
+
+    # GET /results/summary: headline benchmark numbers from the committed results/ folder.
+    @app.get("/results/summary")
+    def summary() -> dict[str, Any]:
+        return results_summary()
 
     return app

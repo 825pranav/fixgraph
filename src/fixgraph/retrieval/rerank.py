@@ -57,8 +57,15 @@ class CrossEncoderReranker:
         import torch
         from sentence_transformers import CrossEncoder
 
-        device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        kwargs = {"torch_dtype": torch.float16} if device == "cuda" else {}
+        # Same device and dtype rule as SentenceTransformerEmbedder (GPU float16, CPU float32).
+        device = device or (
+            "cuda"
+            if torch.cuda.is_available()
+            else "mps"
+            if torch.backends.mps.is_available()
+            else "cpu"
+        )
+        kwargs = {"torch_dtype": torch.float32 if device == "cpu" else torch.float16}
         self._model = CrossEncoder(
             model_name, device=device, max_length=max_length, model_kwargs=kwargs
         )

@@ -50,8 +50,17 @@ class SentenceTransformerEmbedder:
         import torch
         from sentence_transformers import SentenceTransformer
 
-        device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        kwargs = {"torch_dtype": torch.float16} if device == "cuda" else {}
+        # Pick the device (CUDA, then Apple MPS, then CPU) and use float16 on the GPU to save memory
+        # on a small card. On CPU force float32: Qwen3 checkpoints default to bfloat16, which is
+        # very slow there.
+        device = device or (
+            "cuda"
+            if torch.cuda.is_available()
+            else "mps"
+            if torch.backends.mps.is_available()
+            else "cpu"
+        )
+        kwargs = {"torch_dtype": torch.float32 if device == "cpu" else torch.float16}
         self._model = SentenceTransformer(model_name, device=device, model_kwargs=kwargs)
         self.batch_size = batch_size
         self.dim = int(self._model.get_embedding_dimension() or 0)
