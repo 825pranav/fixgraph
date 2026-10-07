@@ -286,7 +286,7 @@ def _mean(cell: dict[str, Any]) -> float | None:
 # The headline numbers the dashboard's Benchmarks tab shows, pulled from the committed results.
 def results_summary() -> dict[str, Any]:
     out: dict[str, Any] = {}
-    # Answer quality per system on the 93 reviewed multi-article questions.
+    # Answer quality per system on the reviewed test questions.
     if (test := _read_result("test/report_verified.json")) is not None:
         metrics = [
             "correctness",

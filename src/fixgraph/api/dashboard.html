@@ -232,7 +232,7 @@ async function loadBench() {
   if (s.answers) {
     const rows = Object.entries(s.answers.systems).map(([k, v]) => ({ k, ...v }));
     const b = best(rows, "correctness");
-    html += `<div class="card"><p class="label">Answer quality · ${s.answers.n} reviewed multi-article questions</p>
+    html += `<div class="card"><p class="label">Answer quality · ${s.answers.n} reviewed test questions</p>
       <table><tr><th>System</th><th>Correctness</th><th>Key-fact recall</th><th>Recall@8</th><th>Unsupported claims</th><th>Latency p50 (s)</th></tr>
       ${rows.map((r) => `<tr class="${r.correctness === b ? "best" : ""}"><td>${esc(SYSTEM_NAMES[r.k] || r.k)}</td>
         <td>${fmt(r.correctness)}</td><td>${fmt(r.key_fact_recall)}</td><td>${r.k === "S0" ? "–" : fmt(r["recall@8"])}</td>

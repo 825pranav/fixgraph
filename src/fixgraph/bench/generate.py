@@ -247,7 +247,7 @@ def sample_paths(kg: KG, per_type: int | dict[str, int], seed: int = 13) -> list
     for qtype, cands in candidates.items():
         prefer_multi = qtype in ("version_conditional", "cross_device")
         samples += _take(rng, cands, counts.get(qtype, 0), prefer_multi)
-    # Attach the answer node text so the question writer and leak check can use it.
+    # Attach the answer node text so the question-writing prompt can use it.
     return [
         s.model_copy(update={"answer_texts": [g.text[n] for n in s.answer_nodes]}) for s in samples
     ]

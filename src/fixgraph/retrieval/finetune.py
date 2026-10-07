@@ -192,7 +192,8 @@ def train_listwise(
                 torch.nn.utils.clip_grad_norm_(trainable, 1.0)
                 opt.step()
                 opt.zero_grad()
-        # Record the mean loss for this epoch, then put the model back in eval mode.
+        # Record the mean loss for this epoch.
         history.append(total / max(1, len(order)))
+    # Training done: put the model back in eval mode.
     model.eval()
     return history

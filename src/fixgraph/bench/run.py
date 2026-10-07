@@ -83,7 +83,7 @@ class RetrievalRow(BaseModel):
     seeds: list[str] = []
 
 
-# Stage 2: every system (S1..S4) retrieves top-k chunks for every question; saved to JSONL.
+# Stage 2: every given system retrieves top-k chunks for every question; saved to JSONL.
 def stage_retrieve(
     questions: list[Question], systems: dict[str, Retriever], out: Path, k: int = K
 ) -> list[RetrievalRow]:

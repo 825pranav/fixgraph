@@ -154,7 +154,7 @@ def run_extraction(
         for fut in tqdm(as_completed(futures), total=len(futures), desc=f"extract {model}"):
             rec = fut.result()
             n_ok += rec.ok
-            # Lock so threads never interleave lines; flush so a crash loses only in-flight chunks.
+            # Written from the main thread; flush so a crash loses only in-flight chunks.
             with lock:
                 out.write(rec.model_dump_json() + "\n")
                 out.flush()

@@ -103,7 +103,7 @@ class CachedLLMClient:
             self.misses += 1
         return response
 
-    # Hit/miss counts and hit rate, reported by runs and by the API's /health endpoint.
+    # Hit/miss counts and hit rate, reported by the API's /health endpoint.
     def stats(self) -> dict[str, float]:
         with self._count_lock:
             total = self.hits + self.misses

@@ -80,7 +80,7 @@ def build_graph_index(
     node_ids = nodes["node_id"].to_list()
     index = {n: i for i, n in enumerate(node_ids)}
 
-    # Start from extracted edges, and optionally add GNN-predicted edges for the S4 system.
+    # Start from extracted edges, and optionally add GNN-predicted edges when `predicted` is given.
     edge_frames = [kg.extracted_edges()]
     if predicted is not None and len(predicted):
         edge_frames.append(predicted.select(kg.edges.columns))

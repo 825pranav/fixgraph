@@ -270,7 +270,7 @@ class _SameMeaning(BaseModel):
     same: bool
 
 
-# Build an adjudicator backed by the LLM; build_kg calls it on borderline cluster pairs.
+# Build an adjudicator backed by the LLM; resolve_clustered calls it on borderline cluster pairs.
 def llm_adjudicator(client: LLMClient, model: str, num_ctx: int = 2048) -> Adjudicator:
     # Ask "same meaning?" in a fixed order (better cache hits); a bad reply counts as "no".
     def adjudicate(type_: str, a: str, b: str) -> bool:

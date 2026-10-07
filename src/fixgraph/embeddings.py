@@ -40,7 +40,7 @@ class Embedder(Protocol):
 
 # Real embedder: wraps a sentence-transformers model (Qwen3-Embedding by default).
 class SentenceTransformerEmbedder:
-    # Loads the model once on GPU (half precision) if present, else CPU; records the vector size.
+    # Loads the model once on the best available device; records the vector size.
     def __init__(
         self,
         model_name: str = DEFAULT_EMBEDDING_MODEL,

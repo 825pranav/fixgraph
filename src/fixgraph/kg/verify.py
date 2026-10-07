@@ -405,7 +405,7 @@ def evaluate_edges(
     }
 
 
-# Generic JSONL writer for samples and labels.
+# Generic JSONL writer; `kg edge-sample` uses it for the edge sample.
 def write_jsonl(rows: Iterable[BaseModel], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("".join(r.model_dump_json() + "\n" for r in rows), encoding="utf-8")
