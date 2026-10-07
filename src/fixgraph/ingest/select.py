@@ -7,17 +7,20 @@ Used by: `fixgraph ingest parse | subset` (ingest/cli.py).
 Uses: core.models.Article, core.ontology (product families).
 """
 
+# Imports: regex scoring plus the Article model and the ontology for product families.
 import re
 
 from fixgraph.core.models import Article
 from fixgraph.core.ontology import Ontology
 
+# Words that signal troubleshooting or how-to content; matches raise an article's score.
 _TROUBLESHOOT_RE = re.compile(
     r"\b(if|can't|cannot|won't|isn't|aren't|doesn't|don't|not working|error|alert|fix|"
     r"troubleshoot|reset|restart|restore|update|pair|unpair|connect|charge|charging|battery|"
     r"sync|back up|backup|stuck|frozen|slow|drain|lost|forgot|locked|disabled|unresponsive)\b",
     re.IGNORECASE,
 )
+# Title patterns for articles we never want (security notes, legal, pro apps, enterprise).
 _EXCLUDE_TITLE_RE = re.compile(
     r"security (releases|content)|about the security|legal|warranty|service program|"
     r"exchange program|trade in|apple store|developer|enterprise|business|education|"
@@ -27,12 +30,16 @@ _EXCLUDE_TITLE_RE = re.compile(
 )
 
 
+# Score one article for how troubleshooting-like it is; 0 means drop it.
+# Simple additive rules so the choice is easy to explain and reproduce.
 def relevance(article: Article, ontology: Ontology) -> float:
+    # Drop articles that are not about a target product family or have an excluded title.
     targets = set(ontology.target_families)
     title_families = set(ontology.families_in(article.title)) & targets
     body_families = set(article.product_tags) & targets
     if not body_families or _EXCLUDE_TITLE_RE.search(article.title):
         return 0.0
+    # Add points for a product in the title, troubleshooting words, sane length and numbered steps.
     n_units = sum(len(s.units) for s in article.sections)
     score = 0.0
     score += 2.0 if title_families else 0.5
@@ -43,6 +50,7 @@ def relevance(article: Article, ontology: Ontology) -> float:
     return score
 
 
+# Pick the top `target` articles by relevance; ties broken by article id so reruns match.
 def select_corpus(articles: list[Article], ontology: Ontology, target: int) -> list[Article]:
     scored = [(relevance(a, ontology), a) for a in articles]
     kept = [(s, a) for s, a in scored if s > 0]
@@ -51,6 +59,8 @@ def select_corpus(articles: list[Article], ontology: Ontology, target: int) -> l
     return sorted(chosen, key=lambda a: int(a.article_id))
 
 
+# Trim the corpus to a chunk budget: gold-set articles first, then by relevance.
+# Whole articles only, so no kept article is missing chunks.
 def subset_by_chunk_budget(
     articles: list[Article],
     chunk_counts: dict[str, int],
@@ -61,10 +71,12 @@ def subset_by_chunk_budget(
     """Whole articles under a chunk budget: `must_keep` first (e.g. gold-set articles), then by
     relevance (ties by id). Articles never split, so every kept article is fully covered."""
     must = must_keep or set()
+    # Order: must-keep articles first, then highest relevance, then lowest id.
     order = sorted(
         articles,
         key=lambda a: (a.article_id not in must, -relevance(a, ontology), int(a.article_id)),
     )
+    # Greedily add articles while they fit the budget; must-keep ones are always added.
     kept: list[Article] = []
     used = 0
     for a in order:

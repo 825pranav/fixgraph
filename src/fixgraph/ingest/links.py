@@ -11,6 +11,7 @@ bench.bridge (bridge questions) read data/corpus/links.parquet.
 Uses: ingest.parse (clean, block classes), core.models.Chunk.
 """
 
+# Imports: selectolax parses HTML, polars writes parquet, and parse.clean normalizes text.
 import re
 from collections.abc import Iterable
 from pathlib import Path
@@ -22,13 +23,16 @@ from selectolax.parser import HTMLParser
 from fixgraph.core.models import Chunk
 from fixgraph.ingest.parse import clean
 
+# Matches hrefs that point to another support article and captures its numeric id.
 _ARTICLE_HREF = re.compile(r"(?:support\.apple\.com)?/(?:[a-z]{2}-[a-z]{2}/)?(\d{5,7})(?:$|[/?#])")
+# Splits a block of text into sentences at . ! or ? followed by whitespace.
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 # Content blocks, as in ingest.parse._walk.
 _BLOCKS = "#content p.gb-paragraph, #content ul.gb-list li, #content ol.gb-list li, " + (
     "#content div.gb-note, #content div.gb-callout"
 )
 
+# Column types for links.parquet.
 LINK_SCHEMA = {
     "src_article": pl.String,
     "dst_article": pl.String,
@@ -38,6 +42,7 @@ LINK_SCHEMA = {
 }
 
 
+# One article-to-article link: where it starts, where it goes, its anchor text and sentence.
 class Link(BaseModel):
     src_article: str
     dst_article: str
@@ -46,6 +51,7 @@ class Link(BaseModel):
     src_chunk_id: str = ""  # chunk of src_article containing the sentence ("" if not chunked)
 
 
+# Return the sentence that contains the anchor text, or the whole block if none does.
 def _sentence_with(block_text: str, anchor: str) -> str:
     for sentence in _SENTENCE_END.split(block_text):
         if anchor and anchor in sentence:
@@ -53,18 +59,22 @@ def _sentence_with(block_text: str, anchor: str) -> str:
     return block_text.strip()
 
 
+# Read one article's HTML and return links to other articles that are in our corpus.
 def extract_links(html: str, article_id: str, corpus_ids: set[str]) -> list[Link]:
     tree = HTMLParser(html)
     out: list[Link] = []
     seen: set[tuple[str, str]] = set()
+    # Walk content blocks only, so links in menus and footers are ignored.
     for block in tree.css(_BLOCKS):
         text = clean(block.text(separator=" "))
         for a in block.css("a"):
+            # Keep links that point to a different article that is in the corpus.
             m = _ARTICLE_HREF.search(a.attributes.get("href") or "")
             if not m or m.group(1) == article_id or m.group(1) not in corpus_ids:
                 continue
             anchor = clean(a.text(separator=" "))
             sentence = _sentence_with(text, anchor)
+            # Skip empty anchors and repeats of the same target and sentence.
             if not anchor or (m.group(1), sentence) in seen:
                 continue
             seen.add((m.group(1), sentence))
@@ -76,12 +86,15 @@ def extract_links(html: str, article_id: str, corpus_ids: set[str]) -> list[Link
     return out
 
 
+# Second pass: once chunks exist, record which chunk of the source article holds each sentence.
 def attach_chunks(links: list[Link], chunks: Iterable[Chunk]) -> list[Link]:
     """Fill `src_chunk_id` with the first chunk of the source article containing the sentence."""
+    # Group chunks by article so each link only searches its own article's chunks.
     by_article: dict[str, list[Chunk]] = {}
     for c in chunks:
         by_article.setdefault(c.article_id, []).append(c)
     out = []
+    # For each link, take the first chunk (by id) whose text contains the sentence, else "".
     for link in links:
         cid = next(
             (
@@ -95,11 +108,13 @@ def attach_chunks(links: list[Link], chunks: Iterable[Chunk]) -> list[Link]:
     return out
 
 
+# Save the links to links.parquet with a fixed schema.
 def write_links(links: list[Link], path: Path) -> None:
     rows = [x.model_dump() for x in links]
     pl.DataFrame(rows, schema=LINK_SCHEMA).write_parquet(path)
 
 
+# Load links.parquet; returns an empty list if links were never built.
 def read_links(path: Path) -> list[Link]:
     if not path.exists():
         return []

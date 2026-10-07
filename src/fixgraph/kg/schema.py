@@ -3,8 +3,10 @@
 Used by: kg.validation (`relation_allowed` rejects type-violating relations). No fixgraph imports.
 """
 
+# Only typing helpers are needed: the schema is pure type definitions plus one lookup table.
 from typing import Literal, get_args
 
+# Every node type that can appear in the final graph, including derived ones.
 NodeLabel = Literal[
     "Product",
     "ProductFamily",
@@ -23,6 +25,7 @@ ExtractedType = Literal[
     "Product", "OSVersion", "Component", "Feature", "Symptom", "ErrorCode", "Cause", "Fix"
 ]
 
+# Every edge type in the graph; IN_FAMILY is never extracted, the build adds it from the ontology.
 RelationType = Literal[
     "IN_FAMILY",
     "RUNS",
@@ -53,10 +56,13 @@ EXTRACTED_RELATIONS: dict[str, tuple[frozenset[str], frozenset[str]]] = {
     "SIGNALS": (frozenset({"ErrorCode"}), frozenset({"Symptom"})),
 }
 
+# Plain tuples of the allowed names, handy for loops and validation messages.
 EXTRACTED_TYPES: tuple[str, ...] = get_args(ExtractedType)
 ALL_RELATIONS: tuple[str, ...] = get_args(RelationType)
 
 
+# Check one extracted relation against the table above; validation drops edges that fail this,
+# so for example a Fix can never be the head of CAUSED_BY.
 def relation_allowed(relation: str, head_type: str, tail_type: str) -> bool:
     spec = EXTRACTED_RELATIONS.get(relation)
     return spec is not None and head_type in spec[0] and tail_type in spec[1]

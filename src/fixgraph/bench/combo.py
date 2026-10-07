@@ -13,6 +13,7 @@ Used by: `fixgraph bench combo-split | combo-cache | combo-dev | combo-test` (be
 Uses: retrieval.hybrid (candidates, reranker), bench.stats, bench.schema.
 """
 
+# Imports: the hybrid retriever (S1) for candidates and reranking, plus the stats helpers.
 import random
 import time
 from collections import defaultdict
@@ -24,22 +25,26 @@ from fixgraph.bench.schema import Question, article_of
 from fixgraph.bench.stats import bootstrap_ci, holm, paired_permutation_test
 from fixgraph.retrieval.hybrid import HybridRetriever
 
+# Final answer budget K, S1's rerank pool size, and how many fused candidates we cache.
 K = 8
 POOL = 30  # S1 reranks the top 30 fused candidates
 FUSED = 50
 
 
+# Freeze a dev/test split once, so test results are never used to tune configs.
 def split_questions(
     questions: list[Question], test_frac: float = 0.4, seed: int = 13
 ) -> dict[str, str]:
     """qid -> "dev" | "test". Stratified by question type; bridge pairs (b###a / b###d) are one
     unit so a pair never straddles the split."""
+    # Group questions into units; a bridge pair counts as one unit so it stays on one side.
     units: dict[str, list[str]] = defaultdict(list)  # unit id -> qids
     unit_type: dict[str, str] = {}
     for q in questions:
         unit = q.qid[:-1] if q.qtype in ("bridge", "bridge_direct") else q.qid
         units[unit].append(q.qid)
         unit_type[unit] = "bridge_pair" if q.qtype in ("bridge", "bridge_direct") else q.qtype
+    # Within each question type, shuffle units with a fixed seed and send test_frac of them to test.
     rng = random.Random(seed)
     out: dict[str, str] = {}
     by_type: dict[str, list[str]] = defaultdict(list)
@@ -55,6 +60,7 @@ def split_questions(
     return out
 
 
+# Everything one question needs to rank any config later without touching the GPU again.
 class CacheRow(BaseModel):
     qid: str
     fused: list[str]  # top FUSED fused candidates, best first
@@ -66,6 +72,7 @@ class CacheRow(BaseModel):
     extra_ce_seconds: dict[str, float]  # CE time for the link pool beyond S1's
 
 
+# One expensive GPU pass per question: fused candidates, cross-encoder scores, link pools, timings.
 def build_cache(
     questions: list[Question],
     hybrid: HybridRetriever,
@@ -73,6 +80,7 @@ def build_cache(
     links: list[tuple[str, str]],
     chunk_ids: list[str],
 ) -> list[CacheRow]:
+    # Lookup tables: chunks per article, and undirected article neighbours from Apple links.
     chunks_of: dict[str, list[str]] = defaultdict(list)
     for c in sorted(chunk_ids):
         chunks_of[article_of(c)].append(c)
@@ -83,6 +91,7 @@ def build_cache(
             nbrs[b].add(a)
     assert hybrid.reranker is not None
     rows: list[CacheRow] = []
+    # For each question, first reproduce S1: fuse, rerank the top 30, keep the top K, and time it.
     for q in questions:
         t0 = time.perf_counter()
         fused = [c for c, _ in hybrid.candidates_for(q.question, FUSED)]
@@ -94,6 +103,7 @@ def build_cache(
         reached: dict[str, list[str]] = {}
         pool: dict[str, list[str]] = {}
         extra: dict[str, float] = {}
+        # For d = 1 and 3: add chunks of articles linked to S1's top d hits, and score the new ones.
         for d in (1, 3):
             arts = {n for c in s1[:d] for n in nbrs.get(article_of(c), ())}
             reached[str(d)] = sorted({c for a in arts for c in chunks_of[a]})
@@ -106,6 +116,7 @@ def build_cache(
             pool[str(d)] = [c for c in reached[str(d)] if c not in head]
         # d=3's extra time excludes chunks already scored for d=1; charge d=3 the full cost
         extra["3"] += extra["1"]
+        # Save the cached row for this question.
         rows.append(
             CacheRow(
                 qid=q.qid,
@@ -121,6 +132,7 @@ def build_cache(
     return rows
 
 
+# One combination setting to try: how to mix linked chunks into S1's ranking.
 class Config(BaseModel):
     """One candidate. kind: s1 | prior | protected | union."""
 
@@ -129,6 +141,7 @@ class Config(BaseModel):
     lam: float = 0.0
     routing: bool = False
 
+    # Short readable name used as the system label in reports.
     @property
     def name(self) -> str:
         if self.kind == "s1":
@@ -138,6 +151,7 @@ class Config(BaseModel):
         return f"{self.kind}-d{self.d}{lam}{route}"
 
 
+# All configs explored on the dev split.
 def grid() -> list[Config]:
     """The D37 search grid: 12 prior + 2 protected + 2 union configs."""
     out = [Config(kind="prior", d=d, lam=lam, routing=r)
@@ -147,25 +161,31 @@ def grid() -> list[Config]:
     return out
 
 
+# Rank one question's chunks for a config, using only cached scores (fast, no GPU).
 def rank(row: CacheRow, cfg: Config, route_threshold: float) -> list[str]:
     """Top K chunks for one question under `cfg` (pure; uses only cached scores)."""
     if cfg.kind == "s1":
         return row.s1
+    # Routing: if S1's top score is already confident, keep S1's answer unchanged.
     top_score = row.ce[row.s1[0]] if row.s1 else float("-inf")
     if cfg.routing and top_score >= route_threshold:
         return row.s1  # confident: leave S1 alone
+    # Candidate pool = S1's top 30 plus the link-reached chunks.
     head = row.fused[:POOL]
     reached = set(row.link_reached[str(cfg.d)])
     pool = list(dict.fromkeys(head + row.link_pool[str(cfg.d)]))
+    # "protected": keep S1's top 6 fixed and fill the last slots with the best link-reached chunks.
     if cfg.kind == "protected":
         keep = row.s1[:6]
         extra = sorted((c for c in reached if c not in keep), key=lambda c: -row.ce[c])
         fill = extra + [c for c in row.s1[6:] if c not in extra]
         return (keep + fill)[:K]
+    # "prior"/"union": rerank the pool, giving link-reached chunks a bonus lam (0 for union).
     lam = cfg.lam if cfg.kind == "prior" else 0.0
     return sorted(pool, key=lambda c: -(row.ce[c] + (lam if c in reached else 0.0)))[:K]
 
 
+# Find the answer chunk in article C for bridge questions, via the direct twin if needed.
 def _answer_chunk(q: Question, by_qid: dict[str, Question]) -> str | None:
     """Gold C chunk for bridge questions (the direct twin's only gold chunk)."""
     if q.qtype == "bridge_direct":
@@ -176,6 +196,7 @@ def _answer_chunk(q: Question, by_qid: dict[str, Question]) -> str | None:
     return None
 
 
+# Per-question metrics: recall@8 for all, plus answer-chunk hit@8 for bridge questions.
 def per_question(
     questions: list[Question], ranked: dict[str, list[str]]
 ) -> dict[str, dict[str, float]]:
@@ -191,10 +212,12 @@ def per_question(
     return out
 
 
+# Average rounded to 4 places, or None for an empty list.
 def _mean(xs: list[float]) -> float | None:
     return round(sum(xs) / len(xs), 4) if xs else None
 
 
+# Average recall@8 and answer_hit@8 over one subset of questions.
 def summarize(
     questions: list[Question], per: dict[str, dict[str, float]], subset: str
 ) -> dict[str, Any]:
@@ -204,12 +227,14 @@ def summarize(
     return {"n": len(qs), "recall@8": _mean(rec), "answer_hit@8": _mean(hits)}
 
 
+# Does a question belong to a named subset (main, bridge, a question type, ...)?
 def _in_subset(q: Question, subset: str) -> bool:
     bridge = q.qtype in ("bridge", "bridge_direct")
     return {"main": not bridge, "bridge_all": bridge, "bridge": q.qtype == "bridge",
             "bridge_direct": q.qtype == "bridge_direct"}.get(subset, q.qtype == subset)  # fmt: skip
 
 
+# Count gold chunks the combo gains over S1 (recovered) and loses from S1 (broken).
 def recovered_broken(
     questions: list[Question], s1: dict[str, list[str]], combo: dict[str, list[str]]
 ) -> dict[str, dict[str, int]]:
@@ -226,6 +251,7 @@ def recovered_broken(
     return dict(out)
 
 
+# Final one-time test evaluation: S1 versus each chosen finalist config.
 def test_report(
     questions: list[Question],
     rows: dict[str, CacheRow],
@@ -233,14 +259,17 @@ def test_report(
     route_threshold: float,
 ) -> dict[str, Any]:
     """The single locked-test evaluation (D38): S1 vs each finalist."""
+    # Baseline S1 rankings and metrics.
     s1_rank = {q.qid: rank(rows[q.qid], Config(kind="s1"), route_threshold) for q in questions}
     s1_per = per_question(questions, s1_rank)
     systems: dict[str, Any] = {}
     tests: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    # For each finalist: rank, score, recovered/broken counts and the extra rerank latency.
     for cfg in finalists:
         r = {q.qid: rank(rows[q.qid], cfg, route_threshold) for q in questions}
         per = per_question(questions, r)
         extra = [rows[q.qid].extra_ce_seconds[str(cfg.d)] for q in questions]
+        # With routing, confident questions skip the extra rerank, so they cost no extra time.
         if cfg.routing:
             extra = [
                 0.0 if rows[q.qid].ce[rows[q.qid].s1[0]] >= route_threshold else e
@@ -252,6 +281,7 @@ def test_report(
             "recovered_broken": recovered_broken(questions, s1_rank, r),
             "extra_latency_s": {"mean": _mean(extra), "p95": _p95(extra)},
         }
+    # Build a results table per subset with CIs for S1 and every finalist.
     subsets = ["main", *sorted({q.qtype for q in questions if not _in_subset(q, "bridge_all")}),
                "bridge", "bridge_direct"]  # fmt: skip
     table: dict[str, dict[str, Any]] = {}
@@ -262,6 +292,7 @@ def test_report(
         table[sub] = {"S1": _metric_ci(qs, s1_per)}
         for name, sysd in systems.items():
             table[sub][name] = _metric_ci(qs, sysd["per_question"])
+        # Paired permutation tests vs S1 per metric, Holm-corrected across finalists.
         for metric in ("recall@8", "answer_hit@8"):
             keyed = [q.qid for q in qs if metric in s1_per[q.qid]]
             if len(keyed) < 3:
@@ -276,6 +307,7 @@ def test_report(
             for row, adj in zip(rows_t, holm([r["p"] for r in rows_t]), strict=True):
                 row["p_holm"] = round(adj, 4)
             tests[sub] += rows_t
+    # Return the full report, including S1 latency and each finalist's extra latency.
     s1_lat = [rows[q.qid].s1_seconds for q in questions]
     return {
         "n_questions": len(questions),
@@ -292,6 +324,7 @@ def test_report(
     }
 
 
+# Mean and bootstrap CI of each metric over a set of questions.
 def _metric_ci(qs: list[Question], per: dict[str, dict[str, float]]) -> dict[str, Any]:
     out: dict[str, Any] = {"n": len(qs)}
     for metric in ("recall@8", "answer_hit@8"):
@@ -302,6 +335,7 @@ def _metric_ci(qs: list[Question], per: dict[str, dict[str, float]]) -> dict[str
     return out
 
 
+# Simple 95th percentile used for latency.
 def _p95(xs: list[float]) -> float | None:
     if not xs:
         return None

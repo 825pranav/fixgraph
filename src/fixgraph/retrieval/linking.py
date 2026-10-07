@@ -15,6 +15,7 @@ retrieval.graphrag (seeds). Uses: retrieval.index (node collection), embeddings,
 llm.structured.
 """
 
+# Imports: Qdrant for the node-name index, the ontology for rule matches, and the LLM helpers.
 import math
 import re
 
@@ -28,9 +29,11 @@ from fixgraph.llm.base import ChatMessage, LLMClient, LLMRequest
 from fixgraph.llm.structured import StructuredOutputError, complete_structured
 from fixgraph.retrieval.index import NODES
 
+# Regex that finds error codes like "error 4013" or "error code -36" in the question.
 _ERROR_RE = re.compile(r"\berror\s*(?:code\s*)?(-?\d{1,6})\b", re.IGNORECASE)
 
 
+# The phrases pulled out of a question, grouped by entity type, with small caps per type.
 class Mentions(BaseModel):
     products: list[str] = Field(default_factory=lambda: list[str](), max_length=4)
     symptoms: list[str] = Field(default_factory=lambda: list[str](), max_length=3)
@@ -40,6 +43,7 @@ class Mentions(BaseModel):
     os_versions: list[str] = Field(default_factory=lambda: list[str](), max_length=3)
 
 
+# Prompt asking the LLM to copy short phrases from the question into each mention list.
 _PROMPT = """Extract what this Apple support question mentions. Copy short phrases from the
 question; use empty lists when absent.
 products: Apple devices (iPhone, Apple Watch, AirPods Pro, Mac...).
@@ -52,6 +56,7 @@ os_versions: OS versions ("iOS 26", "macOS Tahoe").
 Question: {question}"""
 
 
+# Builds a deterministic, schema-constrained LLM request for one question's mentions.
 def build_mention_request(question: str, model: str) -> LLMRequest:
     return LLMRequest(
         model=model,
@@ -64,6 +69,7 @@ def build_mention_request(question: str, model: str) -> LLMRequest:
     )
 
 
+# Question in, Mentions out via the LLM; on any failure returns empty Mentions instead of crashing.
 def extract_mentions(client: LLMClient, question: str, model: str) -> Mentions:
     try:
         return complete_structured(client, build_mention_request(question, model), Mentions)
@@ -71,8 +77,10 @@ def extract_mentions(client: LLMClient, question: str, model: str) -> Mentions:
         return Mentions()
 
 
+# Question in, Mentions out using only ontology lookups and the error-code regex (no model).
 def rule_mentions(question: str, ontology: Ontology) -> Mentions:
     """Model-free mentions from the ontology (always merged in)."""
+    # Prefer specific product names; fall back to product families if none are found.
     products = [name for _, name in ontology.products_in(question)] or ontology.families_in(
         question
     )
@@ -85,7 +93,9 @@ def rule_mentions(question: str, ontology: Ontology) -> Mentions:
     )
 
 
+# Combines LLM and rule mentions per field, dropping blanks and duplicates but keeping order.
 def merge_mentions(a: Mentions, b: Mentions) -> Mentions:
+    # Order-preserving union of two phrase lists.
     def m(x: list[str], y: list[str]) -> list[str]:
         seen: dict[str, None] = {}
         for s in x + y:
@@ -93,6 +103,7 @@ def merge_mentions(a: Mentions, b: Mentions) -> Mentions:
                 seen.setdefault(s.strip(), None)
         return list(seen)
 
+    # Build the merged result without re-running validation (lists may exceed the field caps).
     return Mentions.model_construct(
         products=m(a.products, b.products),
         symptoms=m(a.symptoms, b.symptoms),
@@ -103,6 +114,7 @@ def merge_mentions(a: Mentions, b: Mentions) -> Mentions:
     )
 
 
+# Which KG node labels each mention type is allowed to link to.
 _LABELS = {
     "products": ["Product", "ProductFamily"],
     "symptoms": ["Symptom"],
@@ -113,6 +125,7 @@ _LABELS = {
 }
 
 
+# One seed node for graph search: its weight, the phrase that found it and the raw similarity.
 class Seed(BaseModel):
     node_id: str
     weight: float
@@ -120,7 +133,9 @@ class Seed(BaseModel):
     similarity: float
 
 
+# Maps a question's mentions to seed KG nodes by searching the "nodes" Qdrant collection.
 class EntityLinker:
+    # Keeps the Qdrant client, embedder, per-node chunk counts and the linking thresholds.
     def __init__(
         self,
         client: QdrantClient,
@@ -135,8 +150,10 @@ class EntityLinker:
         self.threshold, self.per_mention = threshold, per_mention
         self.question_symptoms = question_symptoms
 
+    # Embeds a phrase and finds the closest node names, filtered to the allowed labels.
     def _search(self, text: str, labels: list[str], limit: int) -> list[tuple[str, float]]:
         vec = self.embedder.encode([text], query=False)[0].tolist()
+        # Over-fetch (3x) because one node has several aliases, then keep each node's best score.
         res = self.client.query_points(
             NODES,
             query=vec,
@@ -153,17 +170,21 @@ class EntityLinker:
             best[nid] = max(best.get(nid, 0.0), float(p.score))
         return sorted(best.items(), key=lambda x: -x[1])[:limit]
 
+    # Down-weights hub nodes: the more chunks mention a node, the smaller its weight.
     def specificity(self, node_id: str) -> float:
         return 1.0 / math.log(2 + self.node_chunk_counts.get(node_id, 0))
 
+    # Question + mentions in, seed nodes sorted by weight out; graphrag uses them to start PageRank.
     def link(self, question: str, mentions: Mentions) -> list[Seed]:
         seeds: dict[str, Seed] = {}
 
+        # Add a seed weighted by similarity x specificity; keep the best weight if seen twice.
         def add(nid: str, sim: float, mention: str) -> None:
             w = sim * self.specificity(nid)
             if nid not in seeds or seeds[nid].weight < w:
                 seeds[nid] = Seed(node_id=nid, weight=w, mention=mention, similarity=sim)
 
+        # Link each mention to its top nodes of the right type, keeping matches over the threshold.
         for field, labels in _LABELS.items():
             for mention in getattr(mentions, field):
                 for nid, sim in self._search(mention, labels, self.per_mention):
@@ -173,4 +194,5 @@ class EntityLinker:
         for nid, sim in self._search(question, ["Symptom", "ErrorCode"], self.question_symptoms):
             if sim >= self.threshold:
                 add(nid, sim * 0.8, "<question>")
+        # Highest-weight seeds first.
         return sorted(seeds.values(), key=lambda s: -s.weight)

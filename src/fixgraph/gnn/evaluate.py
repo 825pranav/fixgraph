@@ -5,6 +5,7 @@ under random tie-breaking). AUROC (secondary) compares each positive with one sa
 Used by: gnn/cli.py (`gnn train`) on the score matrices from gnn.models. No fixgraph imports.
 """
 
+# Imports: numpy and torch only; this module just scores rankings.
 from collections import defaultdict
 from collections.abc import Callable
 
@@ -12,9 +13,11 @@ import numpy as np
 import torch
 from torch import Tensor
 
+# A scoring function: given symptom indices, return a score for every Fix node.
 ScoreFn = Callable[[Tensor], Tensor]  # symptom indices -> [len, num_fix] scores
 
 
+# Map each symptom to the set of fixes it is already known to have, for filtered ranking.
 def known_fixes(edge_index: Tensor) -> dict[int, set[int]]:
     known: dict[int, set[int]] = defaultdict(set)
     for s, f in edge_index.t().tolist():
@@ -22,12 +25,14 @@ def known_fixes(edge_index: Tensor) -> dict[int, set[int]]:
     return dict(known)
 
 
+# Rank each held-out (symptom, fix) among all fixes, ignoring the symptom's other true fixes.
 def filtered_ranks(
     score_fn: ScoreFn, test_pos: Tensor, known: dict[int, set[int]]
 ) -> tuple[list[float], list[float], list[float]]:
     """Returns (ranks, positive scores, sampled-negative scores)."""
     if test_pos.size(1) == 0:
         return [], [], []
+    # Score all fixes once for every distinct test symptom.
     symptoms = torch.unique(test_pos[0])
     scores = score_fn(symptoms).float()
     row_of = {int(s): i for i, s in enumerate(symptoms.tolist())}
@@ -35,6 +40,7 @@ def filtered_ranks(
     ranks: list[float] = []
     pos_scores: list[float] = []
     neg_scores: list[float] = []
+    # Per test edge: hide other known fixes, count fixes that score higher (ties = half).
     for s, f in test_pos.t().tolist():
         row = scores[row_of[s]].clone()
         others = [x for x in known.get(s, set()) if x != f]
@@ -45,12 +51,14 @@ def filtered_ranks(
         ties = int((row == target).sum()) - 1
         ranks.append(1.0 + greater + ties / 2.0)
         pos_scores.append(target)
+        # Also sample one random non-fix as a negative, for AUROC.
         candidates = [x for x in range(row.numel()) if x not in known.get(s, set())]
         if candidates:
             neg_scores.append(float(scores[row_of[s], int(gen.choice(candidates))]))
     return ranks, pos_scores, neg_scores
 
 
+# AUROC: chance a true edge scores above a random negative, counting ties as half.
 def auroc(pos: list[float], neg: list[float]) -> float:
     """Mann-Whitney AUROC; 0.5 per tie."""
     if not pos or not neg:
@@ -60,6 +68,7 @@ def auroc(pos: list[float], neg: list[float]) -> float:
     return float(((p > n).sum() + 0.5 * (p == n).sum()) / (p.size * n.size))
 
 
+# Turn ranks into MRR and Hits@1/3/10 (NaNs when there are no test edges).
 def ranking_metrics(ranks: list[float]) -> dict[str, float]:
     if not ranks:
         return {
@@ -79,11 +88,13 @@ def ranking_metrics(ranks: list[float]) -> dict[str, float]:
     }
 
 
+# Full evaluation for one model: filtered ranking metrics plus AUROC.
 def evaluate(score_fn: ScoreFn, test_pos: Tensor, known: dict[int, set[int]]) -> dict[str, float]:
     ranks, pos, neg = filtered_ranks(score_fn, test_pos, known)
     return {**ranking_metrics(ranks), "auroc": auroc(pos, neg)}
 
 
+# Average each metric across seeds, with its standard deviation.
 def aggregate(runs: list[dict[str, float]]) -> dict[str, dict[str, float]]:
     """mean and std (ddof=0) across seeds for every metric."""
     out: dict[str, dict[str, float]] = {}

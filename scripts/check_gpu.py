@@ -4,14 +4,17 @@ Standalone script run once on a new machine (`python scripts/check_gpu.py`, or t
 task) before any GPU stage. Uses only torch; imports nothing from fixgraph.
 """
 
+# Imports: only sys and torch; this check does not depend on the fixgraph package.
 import sys
 
 import torch
 
 
+# Print torch/CUDA info and return 0 if the GPU is usable, 1 if not (used as the exit code).
 def main() -> int:
     print(f"torch version:   {torch.__version__}")
     print(f"built for CUDA:  {torch.version.cuda}")
+    # Fail early with a fix hint if torch cannot see CUDA (usually the CPU-only wheel is installed).
     available = torch.cuda.is_available()
     print(f"CUDA available:  {available}")
     if not available:
@@ -22,6 +25,7 @@ def main() -> int:
         )
         return 1
 
+    # Print the GPU name, VRAM and compute capability so we know which models will fit.
     props = torch.cuda.get_device_properties(0)
     print(f"device:          {props.name}")
     print(f"total VRAM:      {props.total_memory / 1024**3:.2f} GiB")
@@ -35,5 +39,6 @@ def main() -> int:
     return 0
 
 
+# Exit with main()'s return code so scripts and CI can tell pass from fail.
 if __name__ == "__main__":
     sys.exit(main())

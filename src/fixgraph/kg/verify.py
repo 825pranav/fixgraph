@@ -17,6 +17,7 @@ Used by: `fixgraph kg verify-edges | edge-sample | edge-eval` (kg/cli.py).
 Uses: kg.store (KG), kg.validation (partial_ratio), llm.structured.
 """
 
+# Imports: a thread pool for parallel judge calls, polars for edge tables, numpy for bootstrap CIs.
 import random
 from collections import defaultdict
 from collections.abc import Iterable
@@ -34,6 +35,7 @@ from fixgraph.kg.validation import partial_ratio
 from fixgraph.llm.base import ChatMessage, LLMClient, LLMRequest
 from fixgraph.llm.structured import StructuredOutputError, complete_structured
 
+# A quote must match the passage at least this well; claims are sent to the model in batches of 12.
 QUOTE_THRESHOLD = 0.85
 MAX_CLAIMS_PER_CALL = 12
 
@@ -52,6 +54,7 @@ TEMPLATES: dict[str, str] = {
     "SIGNALS": '{h} indicates the problem "{t}".',
 }
 
+# Instructions for the judge model: only count facts the passage itself connects, and quote them.
 SYSTEM_VERIFY = """You check facts extracted from an Apple support passage.
 For each numbered statement decide whether the passage itself states it (paraphrase is fine).
 Mark it NOT supported when:
@@ -61,6 +64,7 @@ Mark it NOT supported when:
 If supported, copy the passage sentence that states it, exactly as written."""
 
 
+# One edge phrased as a sentence, tied to one of its source chunks.
 class EdgeClaim(BaseModel):
     edge_id: str
     rel: str
@@ -68,6 +72,7 @@ class EdgeClaim(BaseModel):
     statement: str
 
 
+# Result for one (edge, chunk) pair: the model answer, its quote, and the code-checked verdict.
 class EdgeVerdict(BaseModel):
     edge_id: str
     chunk_id: str
@@ -78,6 +83,7 @@ class EdgeVerdict(BaseModel):
     error: str | None = None
 
 
+# Shape of the judge's JSON reply: a supported flag and a quote per numbered statement.
 class _Item(BaseModel):
     id: int
     supported: bool
@@ -88,20 +94,24 @@ class _Reply(BaseModel):
     verdicts: list[_Item] = Field(default_factory=lambda: list[_Item]())
 
 
+# Edges that came from text extraction; ontology-made edges have no passage to check against.
 def verifiable_edges(kg: KG) -> pl.DataFrame:
     """LLM-extracted edges (ontology-derived IN_FAMILY / seed DEPENDS_ON are not text claims)."""
     return kg.extracted_edges().filter(pl.col("extraction_model") != "ontology")
 
 
+# Turn every extracted edge into one sentence per source chunk, grouped by chunk id.
 def edge_claims(kg: KG) -> dict[str, list[EdgeClaim]]:
     """chunk_id -> statements for every edge that chunk is cited for. Each endpoint is phrased
     with the surface form that chunk used (falls back to the canonical text), so a merged node's
     medoid text from another article does not leak into the check."""
+    # Look up node text, preferring the exact words each chunk used for that node.
     text = dict(zip(kg.nodes["node_id"], kg.nodes["canonical_text"], strict=True))
     surface: dict[tuple[str, str], str] = {}
     for nid, cid, s in kg.mentions.select("node_id", "chunk_id", "surface").iter_rows():
         surface.setdefault((nid, cid), s)
     out: dict[str, list[EdgeClaim]] = defaultdict(list)
+    # Fill the relation's sentence template for each chunk the edge cites.
     for r in verifiable_edges(kg).iter_rows(named=True):
         for cid in r["source_chunk_ids"]:
             h = surface.get((r["src"], cid), text[r["src"]])
@@ -117,6 +127,7 @@ def edge_claims(kg: KG) -> dict[str, list[EdgeClaim]]:
     return dict(out)
 
 
+# Build the judge request: the passage plus a numbered list of statements to check.
 def verify_request(passage: str, claims: list[EdgeClaim], model: str) -> LLMRequest:
     numbered = "\n".join(f"{i}. {c.statement}" for i, c in enumerate(claims))
     return LLMRequest(
@@ -136,6 +147,7 @@ def verify_request(passage: str, claims: list[EdgeClaim], model: str) -> LLMRequ
     )
 
 
+# Check one chunk's claims with the judge model, then confirm each quote really is in the passage.
 def verify_chunk(
     client: LLMClient, passage: str, claims: list[EdgeClaim], model: str
 ) -> list[EdgeVerdict]:
@@ -144,6 +156,7 @@ def verify_chunk(
     same context. A failed call marks its claims unsupported with the error recorded (fail
     closed: an edge nobody could confirm is not kept)."""
     out: list[EdgeVerdict] = []
+    # Send claims in batches; a failed call leaves every claim in the batch unsupported.
     for i in range(0, len(claims), MAX_CLAIMS_PER_CALL):
         batch = claims[i : i + MAX_CLAIMS_PER_CALL]
         try:
@@ -152,6 +165,7 @@ def verify_chunk(
             error = None
         except (StructuredOutputError, RuntimeError) as exc:
             items, error = {}, str(exc)[:200]
+        # Supported only if the model said yes AND its quote fuzzy-matches the passage text.
         for j, c in enumerate(batch):
             v = items.get(j)
             llm_ok = bool(v and v.supported)
@@ -171,6 +185,7 @@ def verify_chunk(
     return out
 
 
+# Verify all chunks with a small thread pool; called by `kg verify-edges`.
 def run_verification(
     client: LLMClient,
     claims: dict[str, list[EdgeClaim]],
@@ -189,6 +204,7 @@ def run_verification(
     return [v for chunk_verdicts in results for v in chunk_verdicts]
 
 
+# Collect, per edge, the chunks that were confirmed to support it.
 def supported_edges(verdicts: Iterable[EdgeVerdict]) -> dict[str, list[str]]:
     """edge_id -> sorted supporting chunk ids (edges with no support are absent)."""
     out: dict[str, set[str]] = defaultdict(set)
@@ -198,12 +214,14 @@ def supported_edges(verdicts: Iterable[EdgeVerdict]) -> dict[str, list[str]]:
     return {e: sorted(c) for e, c in out.items()}
 
 
+# Build the verified graph: data/kg in, a filtered KG out that verify-edges writes to kg_verified.
 def verified_kg(kg: KG, verdicts: Iterable[EdgeVerdict]) -> KG:
     """Keep supported extracted edges (provenance narrowed to supporting chunks) and the
     ontology IN_FAMILY edges; drop unsupported edges and the text-free seed DEPENDS_ON edges.
     Nodes and mentions are unchanged (a node without edges still maps to its chunks)."""
     keep = supported_edges(verdicts)
     edges = kg.edges
+    # Keep ontology family edges as they are, since they are not text claims.
     ontology_family = edges.filter(
         (pl.col("extraction_model") == "ontology") & (pl.col("rel") == "IN_FAMILY")
     )
@@ -211,6 +229,7 @@ def verified_kg(kg: KG, verdicts: Iterable[EdgeVerdict]) -> KG:
         {"edge_id": list(keep), "supporting": list(keep.values())},
         schema={"edge_id": pl.String, "supporting": pl.List(pl.String)},
     )
+    # Keep supported extracted edges, with provenance narrowed to the chunks that confirmed them.
     extracted = (
         verifiable_edges(kg)
         .join(support, on="edge_id", how="inner")
@@ -220,16 +239,19 @@ def verified_kg(kg: KG, verdicts: Iterable[EdgeVerdict]) -> KG:
         )
         .select(kg.edges.columns)
     )
+    # Keep any non-extracted (predicted) edges, then combine and sort by edge id.
     others = edges.filter(pl.col("origin") != "extracted")
     new_edges = pl.concat([ontology_family, extracted, others]).sort("edge_id")
     return KG(nodes=kg.nodes, edges=new_edges, mentions=kg.mentions)
 
 
+# Save one verdict per line so the run can be audited later.
 def write_verdicts(verdicts: list[EdgeVerdict], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("".join(v.model_dump_json() + "\n" for v in verdicts), encoding="utf-8")
 
 
+# Load saved verdicts back for edge-eval.
 def read_verdicts(path: Path) -> list[EdgeVerdict]:
     lines = path.read_text(encoding="utf-8").splitlines()
     return [EdgeVerdict.model_validate_json(x) for x in lines if x.strip()]
@@ -240,6 +262,7 @@ def read_verdicts(path: Path) -> list[EdgeVerdict]:
 # ---------------------------------------------------------------------------
 
 
+# An edge picked for human labelling, with its sentence for each source chunk.
 class SampledEdge(BaseModel):
     edge_id: str
     rel: str
@@ -247,12 +270,14 @@ class SampledEdge(BaseModel):
     statements: list[str]  # one per chunk, same order
 
 
+# A human's blind label for a sampled edge.
 class EdgeLabel(BaseModel):
     edge_id: str
     supported: bool  # at least one of the edge's source chunks states it
     labeler: str
 
 
+# Split the sample size across relation types in proportion, but at least min_per per type.
 def allocate(sizes: dict[str, int], n: int, min_per: int) -> dict[str, int]:
     """Proportional allocation with a floor of `min_per` (capped at the stratum size)."""
     total = sum(sizes.values())
@@ -260,7 +285,9 @@ def allocate(sizes: dict[str, int], n: int, min_per: int) -> dict[str, int]:
     return alloc
 
 
+# Draw a seeded sample of edges stratified by relation type for blind labelling.
 def edge_sample(kg: KG, n: int = 200, min_per: int = 5, seed: int = 13) -> list[SampledEdge]:
+    # Group the claims by edge, then group edges by relation type to form the strata.
     claims = [c for cs in edge_claims(kg).values() for c in cs]
     by_edge: dict[str, list[EdgeClaim]] = defaultdict(list)
     for c in claims:
@@ -269,6 +296,7 @@ def edge_sample(kg: KG, n: int = 200, min_per: int = 5, seed: int = 13) -> list[
     for eid, cs in sorted(by_edge.items()):
         strata[cs[0].rel].append(eid)
     alloc = allocate({k: len(v) for k, v in strata.items()}, n, min_per)
+    # Sample within each stratum and keep each edge's sentences in chunk order.
     rng = random.Random(seed)
     out: list[SampledEdge] = []
     for rel in sorted(strata):
@@ -285,6 +313,7 @@ def edge_sample(kg: KG, n: int = 200, min_per: int = 5, seed: int = 13) -> list[
     return out
 
 
+# Estimate the unsupported-edge rate, weighting each stratum by how many edges it really has.
 def _rate(
     strata: dict[str, list[tuple[bool, bool]]], sizes: dict[str, int], kept_only: bool
 ) -> float:
@@ -301,6 +330,7 @@ def _rate(
     return num / den if den else float("nan")
 
 
+# Compare human labels with verifier results: hallucinated rate before/after and verifier P/R.
 def evaluate_edges(
     sample: list[SampledEdge],
     labels: list[EdgeLabel],
@@ -310,6 +340,7 @@ def evaluate_edges(
     n_boot: int = 2000,
     seed: int = 13,
 ) -> dict[str, Any]:
+    # Pair each labelled sampled edge with whether the verifier kept it, grouped by relation.
     lab = {x.edge_id: x.supported for x in labels}
     kept = set(supported_edges(verdicts))
     strata: dict[str, list[tuple[bool, bool]]] = defaultdict(list)
@@ -317,6 +348,7 @@ def evaluate_edges(
         if s.edge_id in lab:
             strata[s.rel].append((lab[s.edge_id], s.edge_id in kept))
 
+    # Bootstrap confidence interval: resample within each stratum and recompute the rate.
     def ci(kept_only: bool) -> dict[str, float]:
         rng = np.random.default_rng(seed)
         boots = []
@@ -336,11 +368,13 @@ def evaluate_edges(
             "hi": round(float(hi), 3),
         }
 
+    # Confusion counts between human labels and the verifier's keep/drop decision.
     items = [x for v in strata.values() for x in v]
     tp = sum(lab_ and k for lab_, k in items)
     fp = sum((not lab_) and k for lab_, k in items)
     fn = sum(lab_ and not k for lab_, k in items)
     tn = sum((not lab_) and not k for lab_, k in items)
+    # Per-relation breakdown for the report.
     by_rel = {
         rel: {
             "n_sampled": len(v),
@@ -371,16 +405,19 @@ def evaluate_edges(
     }
 
 
+# Generic JSONL writer for samples and labels.
 def write_jsonl(rows: Iterable[BaseModel], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("".join(r.model_dump_json() + "\n" for r in rows), encoding="utf-8")
 
 
+# Generic JSONL reader that validates each line into the given pydantic model.
 def read_jsonl[T: BaseModel](path: Path, model: type[T]) -> list[T]:
     lines = path.read_text(encoding="utf-8").splitlines()
     return [model.model_validate_json(x) for x in lines if x.strip()]
 
 
+# Number of verifiable edges per relation type, used as stratum sizes.
 def stratum_sizes(kg: KG) -> dict[str, int]:
     counts = verifiable_edges(kg).group_by("rel").len()
     return dict(zip(counts["rel"], counts["len"], strict=True))

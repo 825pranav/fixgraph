@@ -13,6 +13,7 @@ Used by: bench/run.py (judge stage), bench/cli.py (`bench judge-calibrate`).
 Uses: bench.schema.Question, llm.structured.complete_structured.
 """
 
+# Imports: pydantic models define the JSON the judge must return; llm.structured enforces it.
 from collections.abc import Sequence
 from typing import Literal
 
@@ -22,15 +23,18 @@ from fixgraph.bench.schema import Question
 from fixgraph.llm.base import ChatMessage, LLMClient, LLMRequest
 from fixgraph.llm.structured import StructuredOutputError, complete_structured
 
+# The four judge prompt versions we compared during calibration.
 JudgeVariant = Literal["v1", "v2", "v3", "v4"]
 VARIANTS: tuple[JudgeVariant, ...] = ("v1", "v2", "v3", "v4")
 
 
+# What the judge returns: a 0 / 0.5 / 1 score plus one yes/no per key fact.
 class JudgeOutput(BaseModel):
     score: float = Field(ge=0.0, le=1.0, description="0, 0.5 or 1")
     key_facts_covered: list[bool] = Field(default_factory=lambda: list[bool]())
 
 
+# v3 only: the model picks yes/partly/no and our code turns that into the score.
 class _Derived(BaseModel):
     """v3 output: the model classifies, code scores."""
 
@@ -39,6 +43,7 @@ class _Derived(BaseModel):
     contradicts_reference: bool
 
 
+# One hand-labelled answer shown to the judge as a worked example in prompt v4.
 class JudgeExample(BaseModel):
     """A labelled calibration item used as a worked example (v4)."""
 
@@ -49,12 +54,14 @@ class JudgeExample(BaseModel):
     score: float
 
 
+# Original v1 system prompt: a short three-level grading rubric.
 SYSTEM_JUDGE = """You grade answers to Apple troubleshooting questions against a reference.
 score 1: the answer gives the reference's main solution/explanation and nothing contradicting it.
 score 0.5: partially correct (some key points, or correct but missing the main point).
 score 0: wrong, irrelevant, contradicts the reference, or refuses although the reference answers.
 Extra correct details are fine. For each key fact, say whether the answer covers it."""
 
+# v2 rubric: spells out what "main solution" means so the judge is less strict on wording.
 RUBRIC_V2 = """You grade an answer to an Apple troubleshooting question against a reference answer.
 First identify the reference's main solution: the action(s) it tells the user to take, or its
 central explanation.
@@ -68,6 +75,7 @@ score 0: the main solution is missing, the answer contradicts the reference, is 
   refuses/abstains although the reference answers.
 For each key fact, say whether the answer covers it."""
 
+# v3 rubric: asks for a classification instead of a number, so scoring stays in code.
 RUBRIC_V3 = """You grade an answer to an Apple troubleshooting question against a reference answer.
 First identify the reference's main solution: the action(s) it tells the user to take, or its
 central explanation.
@@ -82,9 +90,11 @@ contradicts_reference: true only if the answer tells the user something the refe
   wrong or the opposite of the reference.
 For each key fact, say whether the answer covers it."""
 
+# Map the v3 classification to the numeric score.
 _DERIVED_SCORE = {"yes": 1.0, "partly": 0.5, "no": 0.0}
 
 
+# Build the user message: question, reference answer, numbered key facts and the answer to grade.
 def _user(q: Question, answer_text: str) -> str:
     facts = "\n".join(f"{i}. {f}" for i, f in enumerate(q.key_facts)) or "(none)"
     return (
@@ -93,6 +103,7 @@ def _user(q: Question, answer_text: str) -> str:
     )
 
 
+# Turn calibration examples into fake user/assistant turns (few-shot prompting for v4).
 def _example_messages(examples: Sequence[JudgeExample]) -> list[ChatMessage]:
     out: list[ChatMessage] = []
     for ex in examples:
@@ -113,6 +124,7 @@ def _example_messages(examples: Sequence[JudgeExample]) -> list[ChatMessage]:
     return out
 
 
+# Assemble the full LLM request for one grading call, picking prompt and schema by variant.
 def judge_request(
     q: Question,
     answer_text: str,
@@ -120,6 +132,7 @@ def judge_request(
     variant: JudgeVariant = "v1",
     examples: Sequence[JudgeExample] = (),
 ) -> LLMRequest:
+    # v3 asks for the classification schema; other variants ask for a direct score.
     n = len(q.key_facts)
     if variant == "v3":
         system, schema = RUBRIC_V3, _Derived.model_json_schema()
@@ -128,10 +141,12 @@ def judge_request(
         system = SYSTEM_JUDGE if variant == "v1" else RUBRIC_V2
         schema = JudgeOutput.model_json_schema()
         tail = f"Return score and key_facts_covered with exactly {n} booleans."
+    # System prompt first, then v4's worked examples, then the actual answer to grade.
     messages = [ChatMessage(role="system", content=system)]
     if variant == "v4":
         messages += _example_messages(examples)
     messages.append(ChatMessage(role="user", content=_user(q, answer_text) + tail))
+    # Temperature 0 so grading is repeatable; v4 needs a bigger context for the examples.
     return LLMRequest(
         model=model,
         messages=messages,
@@ -143,6 +158,7 @@ def judge_request(
     )
 
 
+# Grade one answer: called by the judge stage in bench/run.py, returns a JudgeOutput.
 def judge_answer(
     client: LLMClient,
     q: Question,
@@ -152,10 +168,12 @@ def judge_answer(
     variant: JudgeVariant = "v1",
     examples: Sequence[JudgeExample] = (),
 ) -> JudgeOutput:
+    # Shortcuts with no LLM call: unanswerable questions reward abstaining, empty answers score 0.
     if not q.answerable:
         return JudgeOutput(score=1.0 if abstained else 0.0)
     if abstained or not answer_text.strip():
         return JudgeOutput(score=0.0, key_facts_covered=[False] * len(q.key_facts))
+    # Ask the judge model and turn its reply into a score.
     request = judge_request(q, answer_text, model, variant, examples)
     try:
         if variant == "v3":
@@ -166,7 +184,9 @@ def judge_answer(
             out = complete_structured(client, request, JudgeOutput)
             covered_raw = out.key_facts_covered
             score = min((0.0, 0.5, 1.0), key=lambda s: abs(s - out.score))  # snap to rubric
+    # If the model reply cannot be parsed, count the answer as wrong instead of crashing the run.
     except (StructuredOutputError, RuntimeError):
         return JudgeOutput(score=0.0, key_facts_covered=[False] * len(q.key_facts))
+    # Pad or trim the key-fact flags so there is exactly one per key fact.
     covered = (covered_raw + [False] * len(q.key_facts))[: len(q.key_facts)]
     return JudgeOutput(score=score, key_facts_covered=covered)

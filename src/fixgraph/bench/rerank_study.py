@@ -14,6 +14,7 @@ Used by: `fixgraph bench rr-cache | rr-dev | rr-test` (bench/cli.py).
 Uses: bench.combo (subset + per-question metrics), bench.stats, retrieval.hybrid.
 """
 
+# Imports: reuse combo's metrics and K, and the z-score helper from the hybrid retriever.
 import time
 from collections.abc import Callable, Sequence
 from typing import Any
@@ -24,11 +25,13 @@ from fixgraph.bench.combo import K, per_question, recovered_broken
 from fixgraph.bench.schema import Question
 from fixgraph.retrieval.hybrid import zscore
 
+# Largest cached pool, the pool sizes we price, and the question subsets we report.
 POOL_MAX = 100
 SLICES = (30, 50, 100)  # scoring time is recorded per slice so any pool in SLICES is priced
 SUBSETS = ("all", "main", "bridge", "bridge_direct")
 
 
+# Cached data for one question: fused candidates, their RRF scores, and every scorer's scores.
 class StudyRow(BaseModel):
     qid: str
     fused: list[str]  # top POOL_MAX fused (dense + BM25 RRF) candidates, best first
@@ -38,6 +41,7 @@ class StudyRow(BaseModel):
     score_s: dict[str, dict[str, float]]  # scorer -> str(slice end) -> seconds for that slice
 
 
+# Run one reranker over the candidate list in slices, timing each slice separately.
 def score_slices(
     question: str,
     fused: list[str],
@@ -48,6 +52,7 @@ def score_slices(
     out: dict[str, float] = {}
     secs: dict[str, float] = {}
     start = 0
+    # Score each slice and record how long it took, so any pool size can be priced later.
     for end in SLICES:
         part = fused[start:end]
         t0 = time.perf_counter()
@@ -58,6 +63,7 @@ def score_slices(
     return out, secs
 
 
+# One reranking setup: which reranker, pool size, optional second reranker and RRF weight.
 class StudyConfig(BaseModel):
     """scorer: primary reranker; second: optional second reranker blended with weight w2;
     alpha: weight of the first-stage RRF score. Scores are z-normalised within the pool."""
@@ -68,6 +74,7 @@ class StudyConfig(BaseModel):
     w2: float = 0.0
     alpha: float = 0.0
 
+    # Readable config name such as "bge@30+rrf0.25" used in logs and tables.
     @property
     def name(self) -> str:
         n = f"{self.scorer}@{self.pool}"
@@ -78,20 +85,26 @@ class StudyConfig(BaseModel):
         return n
 
 
+# Rank one question under a config using cached scores only (no GPU needed).
 def rank(row: StudyRow, cfg: StudyConfig) -> list[str]:
     """Top K chunks for one question (pure; cached scores only). Ties keep first-stage order."""
+    # Z-normalise the main reranker's scores over the pool so they can be blended.
     pool = row.fused[: cfg.pool]
     total = zscore([row.scores[cfg.scorer][c] for c in pool])
+    # Optionally blend in a second reranker with weight w2.
     if cfg.second:
         z2 = zscore([row.scores[cfg.second][c] for c in pool])
         total = [(1 - cfg.w2) * a + cfg.w2 * b for a, b in zip(total, z2, strict=True)]
+    # Optionally add the first-stage RRF score with weight alpha.
     if cfg.alpha:
         zr = zscore(row.rrf[: cfg.pool])
         total = [a + cfg.alpha * b for a, b in zip(total, zr, strict=True)]
+    # Sort by blended score, breaking ties by first-stage order, and keep the top K.
     order = sorted(range(len(pool)), key=lambda i: (-total[i], i))
     return [pool[i] for i in order[:K]]
 
 
+# Estimate latency for a config: search time plus scoring time of each reranker used.
 def seconds(row: StudyRow, cfg: StudyConfig) -> float:
     """Estimated retrieval latency: search + scoring time of each scorer over the pool."""
     total = row.search_s
@@ -100,6 +113,7 @@ def seconds(row: StudyRow, cfg: StudyConfig) -> float:
     return total
 
 
+# Every config tried on the dev split.
 def grid(scorers: Sequence[str]) -> list[StudyConfig]:
     """The D39 grid: every scorer at each pool size; for the two base families, fusion with the
     first-stage score; and bge + each other scorer blended."""
@@ -114,11 +128,13 @@ def grid(scorers: Sequence[str]) -> list[StudyConfig]:
     return out
 
 
+# Does a question belong to a subset ("all", "main", or a specific question type)?
 def _in(q: Question, subset: str) -> bool:
     bridge = q.qtype in ("bridge", "bridge_direct")
     return {"all": True, "main": not bridge}.get(subset, q.qtype == subset)
 
 
+# Mean recall@8 and answer_hit@8 for a list of questions.
 def _summary(qs: list[Question], per: dict[str, dict[str, float]]) -> dict[str, Any]:
     rec = [per[q.qid]["recall@8"] for q in qs]
     hits = [per[q.qid]["answer_hit@8"] for q in qs if "answer_hit@8" in per[q.qid]]
@@ -129,6 +145,7 @@ def _summary(qs: list[Question], per: dict[str, dict[str, float]]) -> dict[str, 
     }
 
 
+# Dev-split evaluation: metrics, recovered/broken vs baseline and latency for every config.
 def evaluate(
     questions: list[Question],
     rows: dict[str, StudyRow],
@@ -137,8 +154,10 @@ def evaluate(
 ) -> list[dict[str, Any]]:
     """One log entry per config: metrics per subset, recovered/broken vs the baseline, and the
     mean / p95 estimated latency."""
+    # Rank all questions with the baseline once, to compare each config against it.
     base = {q.qid: rank(rows[q.qid], baseline) for q in questions}
     log: list[dict[str, Any]] = []
+    # For each config: rank, compute metrics, compare with baseline and estimate latency.
     for cfg in configs:
         r = {q.qid: rank(rows[q.qid], cfg) for q in questions}
         per = per_question(questions, r)
@@ -157,6 +176,7 @@ def evaluate(
     return log
 
 
+# Pick the dev winner: best recall@8, ties to lower latency; baseline unless strictly beaten.
 def select(log: list[dict[str, Any]], baseline_name: str) -> dict[str, Any]:
     """D39 selection: highest all-dev recall@8; ties -> lower mean latency. The baseline wins
     unless a config strictly beats it."""
@@ -165,6 +185,7 @@ def select(log: list[dict[str, Any]], baseline_name: str) -> dict[str, Any]:
     return best if best["all"]["recall@8"] > base["all"]["recall@8"] else base
 
 
+# Pick up to two finalists: the overall winner and the best one within 10% of baseline latency.
 def select_finalists(log: list[dict[str, Any]], baseline_name: str) -> list[dict[str, Any]]:
     """D41: the D39 pick, plus the best configuration whose mean estimated latency is within 10%
     of the baseline's (if it differs from the pick and strictly beats the baseline on dev)."""
@@ -177,6 +198,7 @@ def select_finalists(log: list[dict[str, Any]], baseline_name: str) -> list[dict
     return [p for p in picks if p["config"] != baseline_name]
 
 
+# Final locked-test report: CIs per subset, tests vs baseline, recovered/broken and latency.
 def test_summary(
     questions: list[Question],
     ranked: dict[str, dict[str, list[str]]],
@@ -188,9 +210,11 @@ def test_summary(
     broken gold chunks, and live latency p50 / p95 / mean."""
     from fixgraph.bench.stats import bootstrap_ci, holm, paired_permutation_test
 
+    # Per-question metrics for every system that was run on test.
     per = {name: per_question(questions, r) for name, r in ranked.items()}
     table: dict[str, Any] = {}
     tests: list[dict[str, Any]] = []
+    # For each subset, build a CI table per system and metric.
     for sub in SUBSETS:
         qs = [q for q in questions if _in(q, sub)]
         if not qs:
@@ -205,6 +229,7 @@ def test_summary(
                     row[metric] = {"mean": round(c.mean, 4), "lo": round(c.lo, 4),
                                    "hi": round(c.hi, 4)}  # fmt: skip
             table[sub][name] = row
+        # Paired permutation tests vs the baseline, Holm-corrected across finalists.
         for metric in ("recall@8", "answer_hit@8"):
             keyed = [q.qid for q in qs if metric in per[baseline_name][q.qid]]
             if len(keyed) < 3:
@@ -221,11 +246,13 @@ def test_summary(
             for row_t, adj in zip(rows_t, holm([r["p"] for r in rows_t]), strict=True):
                 row_t["p_holm"] = round(adj, 4)
             tests += rows_t
+    # Measured latency summary per system: mean, median and p95.
     lat: dict[str, Any] = {}
     for name, xs in latency.items():
         s = sorted(xs)
         lat[name] = {"mean": round(sum(s) / len(s), 4), "p50": round(s[len(s) // 2], 4),
                      "p95": round(s[max(0, int(len(s) * 0.95) - 1)], 4)}  # fmt: skip
+    # Recovered/broken gold chunks for each non-baseline system.
     rb = {name: recovered_broken(questions, ranked[baseline_name], r)
           for name, r in ranked.items() if name != baseline_name}  # fmt: skip
     return {"n_questions": len(questions), "baseline": baseline_name, "table": table,

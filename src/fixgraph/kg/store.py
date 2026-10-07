@@ -5,6 +5,7 @@ bench.generate, bench/cli.py and api/app.py; kg.build and kg.quality use the KG 
 No fixgraph imports.
 """
 
+# Imports: polars for the parquet tables, json for the per-node property blobs.
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,12 +13,14 @@ from typing import Any
 
 import polars as pl
 
+# Column types for the three graph tables, so every writer produces the same parquet layout.
 NODE_SCHEMA = {
     "node_id": pl.String,
     "label": pl.String,
     "canonical_text": pl.String,
     "props_json": pl.String,
 }
+# Each edge keeps the chunk ids it came from (provenance) and whether it was extracted or predicted.
 EDGE_SCHEMA = {
     "edge_id": pl.String,
     "src": pl.String,
@@ -30,9 +33,11 @@ EDGE_SCHEMA = {
     "origin": pl.String,  # extracted | predicted
     "n_support": pl.Int64,
 }
+# One row per (node, chunk) pair: which chunk mentioned the node and with what surface text.
 MENTION_SCHEMA = {"node_id": pl.String, "chunk_id": pl.String, "surface": pl.String}
 
 
+# In-memory graph: three polars tables passed between build, verify, retrieval and the API.
 @dataclass
 class KG:
     nodes: pl.DataFrame
@@ -40,6 +45,7 @@ class KG:
     mentions: pl.DataFrame
     _props: dict[str, dict[str, Any]] = field(default_factory=lambda: dict[str, dict[str, Any]]())
 
+    # Return a node's extra properties, parsing the JSON column once and caching it on first use.
     def props(self, node_id: str) -> dict[str, Any]:
         if not self._props:
             self._props = {
@@ -47,14 +53,17 @@ class KG:
             }
         return self._props.get(node_id, {})
 
+    # Keep only edges that came from the text, dropping model-predicted ones.
     def extracted_edges(self) -> pl.DataFrame:
         return self.edges.filter(pl.col("origin") == "extracted")
 
 
+# The three parquet file paths inside one graph folder.
 def kg_paths(kg_dir: Path) -> tuple[Path, Path, Path]:
     return kg_dir / "nodes.parquet", kg_dir / "edges.parquet", kg_dir / "mentions.parquet"
 
 
+# Save the graph as three parquet files; called at the end of kg build and verify-edges.
 def write_kg(kg: KG, kg_dir: Path) -> None:
     kg_dir.mkdir(parents=True, exist_ok=True)
     n, e, m = kg_paths(kg_dir)
@@ -63,6 +72,7 @@ def write_kg(kg: KG, kg_dir: Path) -> None:
     kg.mentions.write_parquet(m)
 
 
+# Load a saved graph folder back into a KG object for retrieval, the API or the GNN.
 def read_kg(kg_dir: Path) -> KG:
     n, e, m = kg_paths(kg_dir)
     return KG(pl.read_parquet(n), pl.read_parquet(e), pl.read_parquet(m))

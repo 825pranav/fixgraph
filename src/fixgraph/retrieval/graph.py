@@ -12,6 +12,7 @@ Used by: bench/cli.py (`build_graph_index` for S2/S3), retrieval.graphrag.
 Uses: kg.store.KG.
 """
 
+# Imports: numpy/scipy for the sparse adjacency matrix, polars for the KG tables, and the KG type.
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -41,6 +42,8 @@ DEFAULT_REL_WEIGHTS: dict[str, float] = {
 }
 
 
+# In-memory graph used by the graph retrievers: node lists, sparse adjacency, edge list,
+# and maps between nodes and the chunks they come from.
 @dataclass
 class GraphIndex:
     node_ids: list[str]
@@ -56,11 +59,14 @@ class GraphIndex:
     out_edges: dict[int, list[int]] = field(default_factory=lambda: dict[int, list[int]]())
     in_edges: dict[int, list[int]] = field(default_factory=lambda: dict[int, list[int]]())
 
+    # Number of nodes in the graph.
     @property
     def n(self) -> int:
         return len(self.node_ids)
 
 
+# Turns the parquet KG into a GraphIndex: entity nodes, weighted undirected edges and
+# node<->chunk maps. Called by bench/cli.py before running the graph retrievers.
 def build_graph_index(
     kg: KG,
     rel_weights: dict[str, float] | None = None,
@@ -68,11 +74,13 @@ def build_graph_index(
     use_type_weights: bool = True,
 ) -> GraphIndex:
     """`use_type_weights=False` is the "PPR without edge-type weights" ablation."""
+    # Keep every node except Article nodes and give each one a row/column number.
     weights = rel_weights or DEFAULT_REL_WEIGHTS
     nodes = kg.nodes.filter(pl.col("label") != "Article")
     node_ids = nodes["node_id"].to_list()
     index = {n: i for i, n in enumerate(node_ids)}
 
+    # Start from extracted edges, and optionally add GNN-predicted edges for the S4 system.
     edge_frames = [kg.extracted_edges()]
     if predicted is not None and len(predicted):
         edge_frames.append(predicted.select(kg.edges.columns))
@@ -82,6 +90,8 @@ def build_graph_index(
     vals: list[float] = []
     out_edges: dict[int, list[int]] = defaultdict(list)
     in_edges: dict[int, list[int]] = defaultdict(list)
+    # Walk every edge: skip unknown or self-loop ends, weight it by relation type x confidence,
+    # store it in the edge list, and add it both ways to the adjacency lists.
     for frame in edge_frames:
         for r in frame.iter_rows(named=True):
             s, d = index.get(r["src"]), index.get(r["dst"])
@@ -106,10 +116,12 @@ def build_graph_index(
             rows += [s, d]
             cols += [d, s]
             vals += [w, w]
+    # Build the sparse matrix; sum_duplicates adds up parallel edges between the same pair.
     n = len(node_ids)
     adj = csr_matrix((np.asarray(vals), (np.asarray(rows), np.asarray(cols))), shape=(n, n))
     adj.sum_duplicates()
 
+    # Map nodes to chunks from the mentions table (where each node's name appears).
     node_chunks: dict[int, set[str]] = defaultdict(set)
     chunk_nodes: dict[str, set[int]] = defaultdict(set)
     for nid, cid in kg.mentions.select("node_id", "chunk_id").iter_rows():
@@ -117,6 +129,7 @@ def build_graph_index(
         if i is not None:
             node_chunks[i].add(cid)
             chunk_nodes[cid].add(i)
+    # Also map nodes to the chunks their extracted edges came from; predicted edges are skipped.
     for s, _rel, d, _c, chunks, origin in edges:
         if origin != "extracted":
             continue
@@ -124,6 +137,7 @@ def build_graph_index(
             for i in (s, d):
                 node_chunks[i].add(cid)
                 chunk_nodes[cid].add(i)
+    # Bundle everything into the GraphIndex.
     return GraphIndex(
         node_ids=node_ids,
         labels=nodes["label"].to_list(),
@@ -146,6 +160,8 @@ MENTION_WEIGHT = 0.2
 LINK_WEIGHT = 0.8
 
 
+# Returns a copy of the graph with one extra node per article (S2L): entity-article edges from
+# mentions, and article-article edges from Apple's hyperlinks. These edges only route PageRank.
 def add_document_layer(
     graph: GraphIndex,
     links: list[tuple[str, str, str]],
@@ -158,6 +174,7 @@ def add_document_layer(
     src_chunk_id). An article node maps to all its chunks, so PPR mass that reaches it (for
     example across a link) scores the linked article's chunks. Document edges have origin
     "document": they route, and are never cited as extracted evidence."""
+    # Collect every article (chunks + link targets) and add a "doc:<article>" node for each.
     articles = sorted({article_of(c) for c in graph.chunk_nodes} | {d for _, d, _ in links})
     base = graph.n
     index = dict(graph.index)
@@ -167,12 +184,14 @@ def add_document_layer(
         node_ids.append(f"doc:{a}")
     art = {a: base + i for i, a in enumerate(articles)}
 
+    # Copy the existing edge list and chunk maps so the original graph is left unchanged.
     rows: list[int] = []
     cols: list[int] = []
     vals: list[float] = []
     edges = list(graph.edges)
     node_chunks = {k: set(v) for k, v in graph.node_chunks.items()}
     chunk_nodes = {k: set(v) for k, v in graph.chunk_nodes.items()}
+    # Join each article node to the entities its chunks mention; map the article to its chunks.
     for cid, nodes in graph.chunk_nodes.items():
         d = art[article_of(cid)]
         node_chunks.setdefault(d, set()).add(cid)
@@ -181,6 +200,7 @@ def add_document_layer(
             rows += [n, d]
             cols += [d, n]
             vals += [mention_weight, mention_weight]
+    # Add an article-to-article edge for each hyperlink, tagged "document" so it is never cited.
     for src, dst, cid in links:
         if src not in art or src == dst:
             continue
@@ -189,6 +209,7 @@ def add_document_layer(
         rows += [s, d]
         cols += [d, s]
         vals += [link_weight, link_weight]
+    # Merge the old adjacency with the new document edges into one bigger sparse matrix.
     n = len(node_ids)
     old = graph.adj.tocoo()
     adj = csr_matrix(
@@ -202,6 +223,7 @@ def add_document_layer(
         shape=(n, n),
     )
     adj.sum_duplicates()
+    # Return the extended graph with "Article" labels and article ids as the new nodes' text.
     return GraphIndex(
         node_ids=node_ids,
         labels=[*graph.labels, *(["Article"] * len(articles))],

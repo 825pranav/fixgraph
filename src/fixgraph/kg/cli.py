@@ -10,6 +10,7 @@ Used by: cli.py (mounted as `kg`).
 Uses: core.config, core.ontology, ingest.store, llm.factory, llm.ollama, embeddings.
 """
 
+# Imports: typer for the commands, plus the corpus readers and each KG step wired up here.
 import json
 import logging
 from pathlib import Path
@@ -29,9 +30,11 @@ from fixgraph.llm.factory import build_llm_client
 from fixgraph.llm.ollama import OllamaClient
 
 logger = logging.getLogger(__name__)
+# Sub-app mounted as `fixgraph kg` by the root CLI.
 app = typer.Typer(no_args_is_help=True, help="Knowledge-graph construction.")
 
 
+# `kg extract`: chunks.parquet in, one JSONL extraction record per chunk out (resumable).
 @app.command()
 def extract(
     model: str | None = typer.Option(None, help="Defaults to llm.extraction_model."),
@@ -42,6 +45,7 @@ def extract(
     unload: bool = typer.Option(True, help="Unload the model from VRAM when done."),
 ) -> None:
     """Extract typed entities/relations from chunks with the local LLM (cached, resumable)."""
+    # Load settings and chunks (optionally only listed ids), plus article titles for the prompt.
     settings = load_settings()
     paths = settings.paths
     model = model or settings.llm.extraction_model
@@ -52,9 +56,11 @@ def extract(
         chunks = [c for c in chunks if c.chunk_id in wanted]
     titles = {a.article_id: a.title for a in read_articles(paths.articles)}
     out = output_path(paths.extractions, model)
+    # Dry run only reports the scope and stops before any model call.
     if dry_run:
         typer.echo(f"{len(chunks)} chunks in scope, model {model}, output {out}")
         return
+    # Run the cached extraction loop, always closing the client even if it fails.
     client = build_llm_client(settings)
     try:
         stats = run_extraction(
@@ -70,6 +76,7 @@ def extract(
         )
     finally:
         client.close()
+    # Free GPU memory by unloading the model from Ollama when finished.
     if unload and settings.llm.backend == "ollama":
         ollama = OllamaClient(settings.llm.base_url)
         ollama.unload(model)
@@ -77,6 +84,7 @@ def extract(
     typer.echo(json.dumps(stats, indent=2))
 
 
+# `kg build`: extraction JSONL in, parquet graph + merges.jsonl + stats.json out.
 @app.command()
 def build(
     model: str | None = typer.Option(None, help="Extraction model whose output to use."),
@@ -87,6 +95,7 @@ def build(
     """Resolve entities and write the parquet KG (nodes, edges with provenance, mentions)."""
     from fixgraph.embeddings import SentenceTransformerEmbedder
 
+    # Keep only extraction records for chunks still in the current corpus.
     settings = load_settings()
     paths = settings.paths
     model = model or settings.llm.extraction_model
@@ -99,6 +108,7 @@ def build(
     missing = len(in_corpus) - len({r.chunk_id for r in records if r.ok})
     if missing:
         logger.warning("%d corpus chunks have no successful extraction yet", missing)
+    # Pick the output folder, then build the graph with the embedder (and the LLM judge if asked).
     target = Path(out_dir) if out_dir else (paths.kg if canonicalize else paths.root / "kg_nocanon")
     embedder = SentenceTransformerEmbedder()
     client = build_llm_client(settings) if adjudicate else None
@@ -116,6 +126,7 @@ def build(
         embedder.release()
         if client:
             client.close()
+    # Write the graph, the merge log, and a stats file for the run.
     write_kg(kg, target)
     with (target / "merges.jsonl").open("w", encoding="utf-8") as f:
         for m in report.merges:
@@ -129,6 +140,7 @@ def build(
     typer.echo(json.dumps(stats, indent=2))
 
 
+# `kg stats`: print node/edge counts for a saved graph.
 @app.command()
 def stats(kg_dir: str | None = typer.Option(None)) -> None:
     """Print graph statistics for a built KG."""
@@ -136,6 +148,7 @@ def stats(kg_dir: str | None = typer.Option(None)) -> None:
     typer.echo(json.dumps(graph_stats(read_kg(Path(kg_dir) if kg_dir else paths.kg)), indent=2))
 
 
+# `kg eval`: score saved extractions against the gold set with precision/recall/F1 per type.
 @app.command("eval")
 def eval_(
     models: list[str] | None = typer.Option(None, "--model", help="Repeatable; default 4B."),
@@ -144,6 +157,7 @@ def eval_(
     out: str | None = typer.Option(None, help="Also write the JSON report to this file."),
 ) -> None:
     """Entity/relation P/R/F1 per type against the gold set, per extraction model."""
+    # Load the gold set, optionally keeping only human-reviewed chunks.
     paths = load_settings().paths
     gold_path = Path(gold_file) if gold_file else paths.gold / "extraction_gold.jsonl"
     gold = [
@@ -162,6 +176,7 @@ def eval_(
         if status == "all"
         else {"reviewed": len(gold), "draft": 0},
     }
+    # For each model, match its validated extractions to the gold chunks and score them.
     for model in models or ["qwen3:4b"]:
         recs = {r.chunk_id: r for r in read_records(output_path(paths.extractions, model))}
         missing = [g.chunk_id for g in gold if g.chunk_id not in recs]
@@ -174,6 +189,7 @@ def eval_(
             "entities": [prf.row(k) for k, prf in sorted(ent.items())],
             "relations": [prf.row(k) for k, prf in sorted(rel.items())],
         }
+    # Print the report and optionally save it as JSON.
     text = json.dumps(report, indent=2)
     if out:
         Path(out).parent.mkdir(parents=True, exist_ok=True)
@@ -181,6 +197,7 @@ def eval_(
     typer.echo(text)
 
 
+# `kg gold-sample`: choose the chunk ids that will be hand-labelled as gold.
 @app.command("gold-sample")
 def gold_sample(n: int = typer.Option(50), seed: int = typer.Option(13)) -> None:
     """Pick N chunks for the gold set and write their ids to data/gold/gold_chunk_ids.txt."""
@@ -195,6 +212,7 @@ def gold_sample(n: int = typer.Option(50), seed: int = typer.Option(13)) -> None
     typer.echo(f"{len(picked)} chunk ids -> {out}")
 
 
+# `kg annotate`: terminal loop for reviewing draft gold labels; saves after each change.
 @app.command()
 def annotate(reviewer: str = typer.Option("developer")) -> None:
     """Review draft gold annotations (keys: a = accept, e = edit in Notepad, s = skip, q = quit)."""
@@ -210,6 +228,7 @@ def annotate(reviewer: str = typer.Option("developer")) -> None:
     typer.echo(f"reviewed {done} this session; {remaining} drafts remaining")
 
 
+# Build the text the verifier reads for each chunk: title, section heading and chunk text.
 def _passages(paths: DataPaths) -> dict[str, str]:
     """chunk_id -> passage shown to the verifier (title + heading + text)."""
     titles = {a.article_id: a.title for a in read_articles(paths.articles)}
@@ -221,6 +240,7 @@ def _passages(paths: DataPaths) -> dict[str, str]:
     return passages
 
 
+# `kg verify-edges`: data/kg in, data/kg_verified out, keeping only edges a chunk really states.
 @app.command("verify-edges")
 def verify_edges(
     kg_dir: str | None = typer.Option(None, help="Input KG; defaults to data/kg."),
@@ -235,11 +255,13 @@ def verify_edges(
     settings = load_settings()
     paths = settings.paths
     model = model or settings.llm.judge_model
+    # Read the input graph, build passages, and turn each edge into a plain-sentence claim.
     src = Path(kg_dir) if kg_dir else paths.kg
     target = Path(out_dir) if out_dir else paths.root / "kg_verified"
     kg = read_kg(src)
     passages = _passages(paths)
     claims = edge_claims(kg)
+    # Ask the judge model about every claim, then unload it from the GPU.
     client = build_llm_client(settings)
     try:
         verdicts = run_verification(client, claims, passages, model, concurrency)
@@ -249,9 +271,11 @@ def verify_edges(
             ollama = OllamaClient(settings.llm.base_url)
             ollama.unload(model)
             ollama.close()
+    # Save per-claim verdicts, drop unsupported edges, and write the verified graph.
     write_verdicts(verdicts, target / "edge_verdicts.jsonl")
     vkg = verified_kg(kg, verdicts)
     write_kg(vkg, target)
+    # Stats record how many claims passed and how many failed only on the quote check.
     stats = graph_stats(vkg)
     stats["verification"] = {
         "model": model,
@@ -264,6 +288,7 @@ def verify_edges(
     typer.echo(json.dumps(stats["verification"], indent=2))
 
 
+# `kg edge-sample`: draw a stratified sample of edges for blind human labelling.
 @app.command("edge-sample")
 def edge_sample_cmd(
     n: int = typer.Option(200), min_per: int = typer.Option(5), seed: int = typer.Option(13)
@@ -278,6 +303,7 @@ def edge_sample_cmd(
     typer.echo(f"{len(sample)} edges -> {out}")
 
 
+# `kg edge-eval`: compare human labels with verifier verdicts to get the hallucinated-edge rate.
 @app.command("edge-eval")
 def edge_eval(
     labels_file: str | None = typer.Option(None, help="Defaults to data/gold/edge_labels.jsonl"),
@@ -294,6 +320,7 @@ def edge_eval(
         stratum_sizes,
     )
 
+    # Load the sample, the labels, and edge counts per stratum before and after verification.
     paths = load_settings().paths
     vdir = Path(verified_dir) if verified_dir else paths.root / "kg_verified"
     sample = read_jsonl(paths.gold / "edge_sample.jsonl", SampledEdge)
@@ -309,6 +336,7 @@ def edge_eval(
         kept,
     )
     report["labelers"] = sorted({x.labeler for x in labels})
+    # Write the report to results/ and print it.
     text = json.dumps(report, indent=2)
     Path(out).parent.mkdir(parents=True, exist_ok=True)
     Path(out).write_text(text + "\n", encoding="utf-8")

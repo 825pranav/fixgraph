@@ -4,6 +4,7 @@ Used by: `fixgraph kg stats | eval` (kg/cli.py); kg.annotate reuses the GoldChun
 Uses: kg.validation (ValidatedExtraction, normalize), kg.store.KG.
 """
 
+# Imports: difflib for fuzzy text matching, scipy sparse graphs for connected-component stats.
 from collections import Counter, defaultdict
 from difflib import SequenceMatcher
 from typing import Any
@@ -22,11 +23,13 @@ from fixgraph.kg.validation import ValidatedExtraction, normalize
 # ---------------------------------------------------------------------------
 
 
+# A hand-labelled entity in the gold set.
 class GoldEntity(BaseModel):
     type: str
     text: str
 
 
+# A hand-labelled relation, stored by text so it can be compared to model output by fuzzy match.
 class GoldRelation(BaseModel):
     head_type: str
     head: str
@@ -35,6 +38,7 @@ class GoldRelation(BaseModel):
     tail: str
 
 
+# One gold-set chunk with its labelled entities and relations, plus who labelled it and status.
 class GoldChunk(BaseModel):
     chunk_id: str
     entities: list[GoldEntity] = Field(default_factory=lambda: list[GoldEntity]())
@@ -43,6 +47,7 @@ class GoldChunk(BaseModel):
     status: str = "draft"  # draft | reviewed
 
 
+# Loose text equality for scoring: normalized equal, contained with similar length, or 80% similar.
 def text_match(a: str, b: str, threshold: float = 0.8) -> bool:
     na, nb = normalize(a), normalize(b)
     if not na or not nb:
@@ -53,6 +58,7 @@ def text_match(a: str, b: str, threshold: float = 0.8) -> bool:
     return SequenceMatcher(None, na, nb).ratio() >= threshold
 
 
+# True/false positive and false negative counts, with precision, recall and F1 derived from them.
 class PRF(BaseModel):
     tp: int = 0
     fp: int = 0
@@ -71,6 +77,7 @@ class PRF(BaseModel):
         p, r = self.precision, self.recall
         return 2 * p * r / (p + r) if p + r else 0.0
 
+    # One report row with the counts and rounded scores.
     def row(self, name: str) -> dict[str, Any]:
         return {
             "name": name,
@@ -83,6 +90,7 @@ class PRF(BaseModel):
         }
 
 
+# Count true positives by pairing each prediction with at most one unused gold item.
 def _greedy_match(pred: list[Any], gold: list[Any], same: Any) -> int:
     used: set[int] = set()
     tp = 0
@@ -95,12 +103,14 @@ def _greedy_match(pred: list[Any], gold: list[Any], same: Any) -> int:
     return tp
 
 
+# Score model extractions against the gold set; used by `kg eval`.
 def evaluate_extractions(
     predictions: dict[str, ValidatedExtraction], gold: list[GoldChunk]
 ) -> tuple[dict[str, PRF], dict[str, PRF]]:
     """Per-type entity PRF and per-relation PRF (plus 'ALL'), matched greedily one-to-one."""
     ent: dict[str, PRF] = defaultdict(PRF)
     rel: dict[str, PRF] = defaultdict(PRF)
+    # Turn each chunk's validated output into the same text form as the gold labels.
     for g in gold:
         v = predictions.get(g.chunk_id) or ValidatedExtraction()
         pred_ents = [GoldEntity(type=e.type, text=e.text) for e in v.entities]
@@ -114,6 +124,7 @@ def evaluate_extractions(
             )
             for r in v.relations
         ]
+        # Entity scores per type, also added into an overall "ALL" row.
         for t in {e.type for e in pred_ents} | {e.type for e in g.entities}:
             p = [e for e in pred_ents if e.type == t]
             gg = [e for e in g.entities if e.type == t]
@@ -122,6 +133,7 @@ def evaluate_extractions(
                 ent[key].tp += tp
                 ent[key].fp += len(p) - tp
                 ent[key].fn += len(gg) - tp
+        # Relation scores per relation type; both the head and the tail text must match.
         for rt in {r.rel for r in pred_rels} | {r.rel for r in g.relations}:
             p = [r for r in pred_rels if r.rel == rt]
             gg = [r for r in g.relations if r.rel == rt]
@@ -142,11 +154,13 @@ def evaluate_extractions(
 # ---------------------------------------------------------------------------
 
 
+# Summary numbers for a graph: counts by label/relation, degrees, fix coverage, connectivity.
 def graph_stats(kg: KG) -> dict[str, Any]:
     nodes, edges = kg.nodes, kg.extracted_edges()
     label_counts = dict(Counter(nodes["label"].to_list()).most_common())
     rel_counts = dict(Counter(edges["rel"].to_list()).most_common())
 
+    # Map node ids to positions and compute each node's degree from the extracted edges.
     ids = nodes["node_id"].to_list()
     index = {n: i for i, n in enumerate(ids)}
     src = np.array([index[s] for s in edges["src"].to_list()], dtype=np.int64)
@@ -155,6 +169,7 @@ def graph_stats(kg: KG) -> dict[str, Any]:
         np.bincount(np.concatenate([src, dst]), minlength=len(ids)) if len(ids) else np.zeros(0)
     )
 
+    # Degree summary per node label, including the share of isolated nodes.
     labels = nodes["label"].to_list()
     degree_by_label: dict[str, dict[str, float]] = {}
     for lab in label_counts:
@@ -166,8 +181,10 @@ def graph_stats(kg: KG) -> dict[str, Any]:
             "isolated_pct": round(100 * float((d == 0).mean()), 1),
         }
 
+    # Share of symptoms that have at least one fix edge.
     symptoms = set(nodes.filter(pl.col("label") == "Symptom")["node_id"].to_list())
     with_fix = set(edges.filter(pl.col("rel") == "RESOLVED_BY")["src"].to_list()) & symptoms
+    # Count connected components and the largest one, ignoring Article nodes.
     graph_nodes = [i for i, x in enumerate(labels) if x != "Article"]
     n_comp, comp_labels, largest = 0, np.zeros(0), 0
     if len(ids):
@@ -189,6 +206,7 @@ def graph_stats(kg: KG) -> dict[str, Any]:
     }
 
 
+# Percent of edges that point back to source chunks; the provenance check for the graph.
 def _provenance_pct(edges: pl.DataFrame) -> float:
     """Share of edges with source chunks (ontology-derived edges count as sourced)."""
     if not len(edges):

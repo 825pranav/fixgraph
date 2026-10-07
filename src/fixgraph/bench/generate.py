@@ -24,6 +24,7 @@ Uses: kg/store.py (KG tables), llm/structured.py (schema-constrained generation)
 bench/schema.py (Question format).
 """
 
+# Imports: polars for the KG tables, the KG store, and the structured LLM helper.
 import random
 from collections import defaultdict
 from collections.abc import Callable
@@ -38,6 +39,7 @@ from fixgraph.kg.store import KG
 from fixgraph.llm.base import ChatMessage, LLMClient, LLMRequest
 from fixgraph.llm.structured import StructuredOutputError, complete_structured
 
+# Alias for one edge row, read from the KG edges table as a dict.
 Edge = dict[str, Any]  # one row of the KG edges table
 
 # A fix shared by more symptoms than this is generic ("Restart your device") and makes a
@@ -45,6 +47,7 @@ Edge = dict[str, Any]  # one row of the KG edges table
 MAX_SHARED_FIX_DEGREE = 3
 
 
+# One sampled graph path: its facts, answer nodes, starting nodes and evidence chunks.
 class PathSample(BaseModel):
     qtype: QType
     facts: list[str]  # "Apple Watch EXHIBITS won't pair", ...
@@ -53,11 +56,13 @@ class PathSample(BaseModel):
     chunk_ids: list[str]
     answer_texts: list[str] = []  # canonical text of answer_nodes, filled by sample_paths
 
+    # Articles that the path's evidence chunks come from.
     @property
     def article_ids(self) -> list[str]:
         return sorted({article_of(c) for c in self.chunk_ids})
 
 
+# Lightweight in-memory view of the KG used while sampling paths.
 @dataclass(frozen=True)
 class _GraphView:
     """Outgoing extracted edges by source node, plus node text/label lookups."""
@@ -66,13 +71,16 @@ class _GraphView:
     text: dict[str, str]
     label: dict[str, str]
 
+    # Render an edge as a readable fact sentence like "iPhone EXHIBITS won't charge".
     def fact(self, e: Edge) -> str:
         return f"{self.text[e['src']]} {e['rel']} {self.text[e['dst']]}"
 
+    # All RESOLVED_BY edges leaving a symptom, i.e. its known fixes.
     def fixes_of(self, symptom: str) -> list[Edge]:
         return [e for e in self.out.get(symptom, []) if e["rel"] == "RESOLVED_BY"]
 
 
+# Build the graph view from the KG: outgoing extracted edges (no ontology edges) and node text.
 def _view(kg: KG) -> _GraphView:
     edges = kg.extracted_edges().filter(pl.col("extraction_model") != "ontology")
     out: dict[str, list[Edge]] = defaultdict(list)
@@ -83,14 +91,17 @@ def _view(kg: KG) -> _GraphView:
     return _GraphView(out=out, text=text, label=label)
 
 
+# Evidence chunk ids behind a set of edges (their provenance).
 def _chunks(*edges: Edge) -> list[str]:
     return sorted({c for e in edges for c in e["source_chunk_ids"]})
 
 
+# Articles behind a set of edges, used to tell single- from multi-article paths.
 def _articles(*edges: Edge) -> set[str]:
     return {article_of(c) for e in edges for c in e["source_chunk_ids"]}
 
 
+# single_hop paths: a symptom and up to three of its fixes, usually from one article.
 def _single_hop(g: _GraphView, symptoms: list[str]) -> list[PathSample]:
     out = []
     for s in symptoms:
@@ -107,14 +118,17 @@ def _single_hop(g: _GraphView, symptoms: list[str]) -> list[PathSample]:
     return out
 
 
+# multi_constraint paths: two symptoms from different articles sharing the same specific fix.
 def _multi_constraint(g: _GraphView, symptoms: list[str]) -> list[PathSample]:
     """Pairs of symptoms whose only shared evidence is a common, non-generic fix node, with each
     symptom's RESOLVED_BY edge supported by a different article."""
+    # Group symptom -> fix edges by the fix they point to.
     by_fix: dict[str, list[Edge]] = defaultdict(list)
     for s in symptoms:
         for e in g.fixes_of(s):
             by_fix[e["dst"]].append(e)
     out = []
+    # For each fix, skip generic ones, then pair up symptoms whose facts live in different articles.
     for fix in sorted(by_fix):
         es = by_fix[fix]
         if len({e["src"] for e in es}) > MAX_SHARED_FIX_DEGREE:
@@ -135,6 +149,7 @@ def _multi_constraint(g: _GraphView, symptoms: list[str]) -> list[PathSample]:
     return out
 
 
+# version_conditional paths: symptom -> fix -> OS version that the fix requires or applies to.
 def _version_conditional(g: _GraphView, symptoms: list[str]) -> list[PathSample]:
     out = []
     for s in symptoms:
@@ -156,6 +171,7 @@ def _version_conditional(g: _GraphView, symptoms: list[str]) -> list[PathSample]
     return out
 
 
+# cross_device paths: a product depends on another and shows a symptom that has a fix.
 def _cross_device(g: _GraphView) -> list[PathSample]:
     out = []
     for es in g.out.values():
@@ -176,6 +192,7 @@ def _cross_device(g: _GraphView) -> list[PathSample]:
     return out
 
 
+# error_code paths: an error code signals a symptom that has a fix.
 def _error_code(g: _GraphView) -> list[PathSample]:
     out = []
     for es in g.out.values():
@@ -194,6 +211,7 @@ def _error_code(g: _GraphView) -> list[PathSample]:
     return out
 
 
+# Randomly pick n paths, optionally taking multi-article ones first.
 def _take(
     rng: random.Random, cands: list[PathSample], n: int, prefer_multi_article: bool
 ) -> list[PathSample]:
@@ -206,13 +224,16 @@ def _take(
     return picked + rng.sample(single, min(n - len(picked), len(single)))
 
 
+# Entry point for generation: sample a fixed number of paths per question type from the KG.
 def sample_paths(kg: KG, per_type: int | dict[str, int], seed: int = 13) -> list[PathSample]:
     """Stratified, seeded path sample. `per_type` is one count for every type or a
     {qtype: count} map (types left out get 0)."""
+    # Seeded RNG and graph view; only symptoms that have at least one fix are used.
     rng = random.Random(seed)
     g = _view(kg)
     symptoms = sorted(n for n, lab in g.label.items() if lab == "Symptom")
     with_fix = [s for s in symptoms if g.fixes_of(s)]
+    # Build every candidate path of each type.
     candidates: dict[str, list[PathSample]] = {
         "single_hop": _single_hop(g, with_fix),
         "multi_constraint": _multi_constraint(g, with_fix),
@@ -220,22 +241,26 @@ def sample_paths(kg: KG, per_type: int | dict[str, int], seed: int = 13) -> list
         "cross_device": _cross_device(g),
         "error_code": _error_code(g),
     }
+    # Draw the requested count per type; two types prefer multi-article paths.
     counts = per_type if isinstance(per_type, dict) else dict.fromkeys(candidates, per_type)
     samples: list[PathSample] = []
     for qtype, cands in candidates.items():
         prefer_multi = qtype in ("version_conditional", "cross_device")
         samples += _take(rng, cands, counts.get(qtype, 0), prefer_multi)
+    # Attach the answer node text so the question writer and leak check can use it.
     return [
         s.model_copy(update={"answer_texts": [g.text[n] for n in s.answer_nodes]}) for s in samples
     ]
 
 
+# JSON shape the question-writing model must return.
 class _Generated(BaseModel):
     question: str
     answer: str
     key_facts: list[str]
 
 
+# Prompt that turns a graph path plus source text into a customer question and reference answer.
 _GEN_PROMPT = """Write one realistic question a customer might ask Apple Support, plus a short
 reference answer and 1-3 key facts.
 Question type: {qtype}. {hint}
@@ -254,6 +279,7 @@ Facts:
 
 Sources:
 {sources}"""
+# Extra per-type instruction appended to the prompt.
 _HINTS = {
     "single_hop": "Describe the problem and ask how to fix it.",
     "multi_constraint": (
@@ -270,14 +296,17 @@ _HINTS = {
     ),
     "error_code": "The question should mention the error code and ask what to do.",
 }
+# Limits on how much source text goes into each generation prompt.
 _MAX_SOURCE_CHARS = 1200
 _MAX_SOURCES = 4
 
 
+# Turn one sampled path into a Question using the LLM; called by `bench generate`.
 def generate_question(
     client: LLMClient, sample: PathSample, chunk_text: dict[str, str], model: str, qid: str
 ) -> Question | None:
     """One question per path, or None if the model's output fails validation twice."""
+    # Build the prompt from the path facts, answer text and trimmed source chunks.
     sources = "\n\n".join(
         chunk_text.get(c, "")[:_MAX_SOURCE_CHARS] for c in sample.chunk_ids[:_MAX_SOURCES]
     )
@@ -288,6 +317,7 @@ def generate_question(
         sources=sources,
         answer="; ".join(sample.answer_texts or sample.answer_nodes),
     )
+    # JSON-schema constrained request so the reply parses into _Generated.
     req = LLMRequest(
         model=model,
         messages=[ChatMessage(role="user", content=prompt)],
@@ -295,10 +325,12 @@ def generate_question(
         max_tokens=300,
         json_schema=_Generated.model_json_schema(),
     )
+    # Give up on this path if the model output cannot be parsed.
     try:
         g = complete_structured(client, req, _Generated)
     except (StructuredOutputError, RuntimeError):
         return None
+    # Gold chunks, seeds and answer nodes come from the path, not the model; starts unverified.
     return Question(
         qid=qid,
         question=g.question.strip(),
@@ -314,6 +346,7 @@ def generate_question(
     )
 
 
+# One-line summary of the auto-screen verdict to show the human reviewer.
 def _screen_line(q: Question) -> str:
     if q.screen is None:
         return "AUTO-SCREEN: not run"
@@ -321,6 +354,7 @@ def _screen_line(q: Question) -> str:
     return f"AUTO-SCREEN: {verdict} - {q.screen.reason}"
 
 
+# Interactive human review: y verifies, n deletes the question, s skips, q quits.
 def verify_loop(
     questions: list[Question],
     chunk_text: dict[str, str],
@@ -333,11 +367,13 @@ def verify_loop(
     done = 0
     i = 0
     todo = sum(not q.verified for q in questions)
+    # Walk the list, skipping already verified questions.
     while i < len(questions):
         q = questions[i]
         if q.verified:
             i += 1
             continue
+        # Show the question, gold answer, key facts, screen verdict and evidence.
         evidence = "\n---\n".join(
             f"[{c}]\n{chunk_text.get(c, '?')[:600]}" for c in q.gold_chunk_ids
         )
@@ -345,6 +381,7 @@ def verify_loop(
             f"\n({done + 1}/{todo}) [{q.qid} | {q.qtype}] {q.question}\nGOLD: {q.gold_answer}"
             f"\nKEY FACTS: {'; '.join(q.key_facts)}\n{_screen_line(q)}\nEVIDENCE:\n{evidence}"
         )
+        # Apply the reviewer's key and save after every change so progress is never lost.
         key = ask("[y]es  [n]o/reject  [s]kip  [q]uit > ").strip().lower()[:1]
         if key == "q":
             break

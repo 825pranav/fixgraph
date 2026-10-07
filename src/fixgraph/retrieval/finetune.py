@@ -13,6 +13,7 @@ Used by: `fixgraph bench ft-synth | ft-train` (bench/cli.py).
 Uses: llm.structured, embeddings, retrieval.rerank.
 """
 
+# Imports: numpy for embeddings, pydantic for records, and the LLM helpers for making questions.
 import logging
 import random
 import re
@@ -26,8 +27,10 @@ from fixgraph.core.models import Chunk
 from fixgraph.llm.base import ChatMessage, LLMClient, LLMRequest
 from fixgraph.llm.structured import StructuredOutputError, complete_structured
 
+# Module logger for training progress.
 logger = logging.getLogger(__name__)
 
+# Prompt asking the local LLM to write one user-style question that the passage answers.
 SYNTH_PROMPT = """You write search queries for a troubleshooting assistant.
 
 Below is a passage from an Apple support article. Write ONE question that a user with a problem
@@ -41,6 +44,7 @@ Passage:
 Return JSON: {{"question": "..."}}"""
 
 
+# One training example: a synthetic question, its positive chunk and hard-negative chunk ids.
 class SynthPair(BaseModel):
     chunk_id: str
     article_id: str
@@ -48,10 +52,12 @@ class SynthPair(BaseModel):
     negatives: list[str] = []  # chunk ids
 
 
+# Shape of the LLM's JSON reply: a single question string.
 class _Synth(BaseModel):
     question: str
 
 
+# Picks a seeded, reproducible sample of training chunks from articles outside the benchmark set.
 def sample_chunks(
     chunks: Sequence[Chunk],
     exclude_articles: set[str],
@@ -60,11 +66,13 @@ def sample_chunks(
     min_tokens: int = 40,
 ) -> list[Chunk]:
     """Seeded sample of at most `n` chunks outside `exclude_articles`, at most 2 per article."""
+    # Keep only chunks from allowed articles that are long enough, then shuffle with the fixed seed.
     pool = [c for c in chunks if c.article_id not in exclude_articles and c.n_tokens >= min_tokens]
     rng = random.Random(seed)
     rng.shuffle(pool)
     per: dict[str, int] = {}
     out: list[Chunk] = []
+    # Take chunks in shuffled order, at most 2 per article, until n are collected.
     for c in pool:
         if per.get(c.article_id, 0) >= 2:
             continue
@@ -75,20 +83,25 @@ def sample_chunks(
     return out
 
 
+# Asks the LLM for a question about one chunk; returns None if the reply fails or looks bad.
 def synth_question(client: LLMClient, model: str, title: str, text: str) -> str | None:
+    # Build the request with the article title and passage filled into the prompt.
     req = LLMRequest(
         model=model,
         messages=[ChatMessage(role="user", content=SYNTH_PROMPT.format(title=title, text=text))],
         num_ctx=4096,
         max_tokens=120,
     )
+    # Get schema-checked JSON; treat any LLM failure as "no question".
     try:
         q = complete_structured(client, req, _Synth).question.strip()
     except (StructuredOutputError, RuntimeError):
         return None
+    # Keep 4-60 word questions that do not say "passage" (a sign the model leaked the setup).
     return q if 4 <= len(q.split()) <= 60 and not re.search(r"\bpassage\b", q, re.I) else None
 
 
+# Finds hard negatives for one question: the most similar chunks from other articles by dense score.
 def mine_negatives(
     q_emb: np.ndarray,
     doc_emb: np.ndarray,
@@ -100,11 +113,13 @@ def mine_negatives(
 ) -> list[str]:
     """The top dense matches from other articles, skipping the first `skip` of them (they are
     the likeliest to be unlabelled positives)."""
+    # Rank chunks by dot product with the question, drop same-article ones, skip the top few.
     order = np.argsort(-(doc_emb @ q_emb))
     out = [doc_ids[i] for i in order if doc_articles[i] != pos_article]
     return out[skip : skip + n]
 
 
+# Loss for one group: the positive passage (index 0) should get the highest score.
 def listwise_loss(scores: Any) -> Any:
     """Softmax cross-entropy with the positive at index 0 of each row: [groups, 1 + n]."""
     import torch
@@ -113,6 +128,7 @@ def listwise_loss(scores: Any) -> Any:
     return torch.nn.functional.cross_entropy(scores, target)
 
 
+# Fine-tunes the cross-encoder on (question, positive, negatives) groups; returns loss per epoch.
 def train_listwise(
     model: Any,
     pairs: list[SynthPair],
@@ -129,11 +145,13 @@ def train_listwise(
     Returns the mean loss per epoch."""
     import torch
 
+    # Seed torch and find the transformer layer numbers in the parameter names.
     torch.manual_seed(seed)
     params = dict(model.named_parameters())
     layer_re = re.compile(r"layers?\.(\d+)\.")
     layer_ids = sorted({int(m.group(1)) for k in params if (m := layer_re.search(k))})
     keep = set(layer_ids[-train_layers:]) if train_layers else set()
+    # Freeze all but the top layers and the scoring head; collect what stays trainable.
     trainable = []
     for k, p in params.items():
         m = layer_re.search(k)
@@ -145,30 +163,36 @@ def train_listwise(
         p.requires_grad_(on)
         if on:
             trainable.append(p)
+    # Set up the optimizer and switch the model to training mode.
     logger.info("training %d / %d parameter tensors", len(trainable), len(params))
     opt = torch.optim.AdamW(trainable, lr=lr, weight_decay=0.01)
     rng = random.Random(seed)
     history: list[float] = []
     model.train()
+    # Each epoch: shuffle the examples and step through them one group at a time.
     for _ in range(epochs):
         order = list(range(len(pairs)))
         rng.shuffle(order)
         total = 0.0
         opt.zero_grad()
         for step, i in enumerate(order, 1):
+            # Score the question against its positive and negatives together (bfloat16 on GPU).
             p = pairs[i]
             texts = [docs[p.chunk_id]] + [docs[c] for c in p.negatives]
             feats = model.preprocess([(p.question, t) for t in texts], prompt=prompt)
             feats = {k: v.to(model.device) if hasattr(v, "to") else v for k, v in feats.items()}
             with torch.autocast("cuda", dtype=torch.bfloat16, enabled=model.device.type == "cuda"):
                 scores = model(feats)["scores"].float().view(1, -1)
+            # Backprop the loss, scaled for gradient accumulation, and track the running total.
             loss = listwise_loss(scores) / accum
             loss.backward()
             total += float(loss.detach()) * accum
+            # Every `accum` steps (and at the end), clip gradients and update the weights.
             if step % accum == 0 or step == len(order):
                 torch.nn.utils.clip_grad_norm_(trainable, 1.0)
                 opt.step()
                 opt.zero_grad()
+        # Record the mean loss for this epoch, then put the model back in eval mode.
         history.append(total / max(1, len(order)))
     model.eval()
     return history

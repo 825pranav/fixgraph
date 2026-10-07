@@ -19,6 +19,7 @@ Used by: `fixgraph bench screen` (bench/cli.py).
 Uses: llm/structured.py (schema-constrained output), bench/schema.py (Question, ScreenResult).
 """
 
+# Imports: the LLM client and structured-output helper, plus fuzzy matching for quote checks.
 import logging
 import re
 from collections import defaultdict
@@ -31,10 +32,12 @@ from fixgraph.kg.validation import partial_ratio
 from fixgraph.llm.base import ChatMessage, LLMClient, LLMRequest
 from fixgraph.llm.structured import StructuredOutputError, complete_structured
 
+# Screen settings: evidence length cap, fuzzy-match threshold, and the answer-leak threshold.
 logger = logging.getLogger(__name__)
 _MAX_CHUNK_CHARS = 1500
 QUOTE_MIN_RATIO = 0.85  # fuzzy match for "the quote occurs in the evidence" (tolerates list joins)
 LEAK_MIN_OVERLAP = 0.6  # share of the answer's content words already present in the question
+# Tokenizer and stopword list used by the leak check to compare content words.
 _WORD = re.compile(r"[a-z0-9]+")
 _STOPWORDS = frozenset(
     {
@@ -75,6 +78,7 @@ _STOPWORDS = frozenset(
 )
 
 
+# Strip common endings so different forms of a word compare as equal.
 def _stem(word: str) -> str:
     """Crude suffix strip so "updating" / "updated" / "updates" all match "update"."""
     for suffix in ("ing", "ed", "es", "s", "e"):
@@ -83,6 +87,7 @@ def _stem(word: str) -> str:
     return word
 
 
+# Lowercase, tokenize, drop stopwords and short words, and stem: the words that carry meaning.
 def _content_words(text: str) -> set[str]:
     return {_stem(w) for w in _WORD.findall(text.lower()) if w not in _STOPWORDS and len(w) > 2}
 
@@ -98,12 +103,14 @@ _TOPIC_WORDS = frozenset(
 )  # fmt: skip
 
 
+# Answer-leak score: how much of the answer's wording the question already contains (0..1).
 def leak_overlap(question: str, answer_texts: list[str], topic_texts: Sequence[str] = ()) -> float:
     """Max share of an answer text's content words that already appear in the question, after
     dropping topic words (device/app names and words of the question's own seed nodes)."""
     q_words = _content_words(question)
     topic = {_stem(w) for w in _TOPIC_WORDS}.union(*(_content_words(t) for t in topic_texts))
     best = 0.0
+    # Keep the worst (highest) overlap over all answer texts.
     for text in answer_texts:
         words = _content_words(text) - topic
         if words:
@@ -111,6 +118,7 @@ def leak_overlap(question: str, answer_texts: list[str], topic_texts: Sequence[s
     return best
 
 
+# JSON shape the screen model must return for the full-evidence check.
 class _EvidenceCheck(BaseModel):
     answerable: bool
     answer_supported: bool
@@ -118,12 +126,15 @@ class _EvidenceCheck(BaseModel):
     reason: str
 
 
+# JSON shape for the single-article check: can this one article answer it alone?
 class _SingleSourceCheck(BaseModel):
     fully_answerable: bool
 
 
+# System prompt shared by both screen checks.
 _SYSTEM = "You audit benchmark questions for a troubleshooting QA dataset. Be strict and literal."
 
+# Prompt for check 2: is the question answerable and the answer supported by the evidence?
 _EVIDENCE_PROMPT = """Question: {question}
 Reference answer: {answer}
 
@@ -138,6 +149,7 @@ Decide:
   answer's main step ("" if there is none).
 - reason: one short sentence explaining any problem (or "ok")."""
 
+# Prompt for check 3: is one article's text alone enough to answer?
 _SINGLE_PROMPT = """Question: {question}
 Reference answer: {answer}
 
@@ -148,10 +160,12 @@ Can the reference answer be fully confirmed from this text alone, with nothing e
 that covers only part of the question (e.g. only one of two problems) is NOT enough."""
 
 
+# Format gold chunks as "[chunk_id] text" blocks, trimmed, to paste into the prompt.
 def _evidence(chunk_ids: list[str], chunk_text: dict[str, str]) -> str:
     return "\n\n".join(f"[{c}] {chunk_text.get(c, '')[:_MAX_CHUNK_CHARS]}" for c in chunk_ids)
 
 
+# Build a deterministic (temperature 0) JSON-schema request for the screen model.
 def _request(model: str, prompt: str, schema: type[BaseModel]) -> LLMRequest:
     return LLMRequest(
         model=model,
@@ -167,6 +181,7 @@ def _request(model: str, prompt: str, schema: type[BaseModel]) -> LLMRequest:
     )
 
 
+# Screen one generated question: leak check, evidence check, then single-article check.
 def screen_question(
     client: LLMClient,
     q: Question,
@@ -175,12 +190,14 @@ def screen_question(
     node_text: dict[str, str] | None = None,
 ) -> ScreenResult:
     """`node_text` maps KG node ids to text, for the leak check on `gold_answer_nodes`."""
+    # Check 1 (no LLM): does the question already give away the answer node's text?
     text_of = node_text or {}
     answer_texts = [text_of.get(n, "") for n in q.gold_answer_nodes]
     seed_texts = [text_of.get(n, "") for n in q.gold_seed_nodes]
     # Only the main answer node: version nodes ("iOS 17") are legitimately named in questions.
     leaks = leak_overlap(q.question, answer_texts[:1], seed_texts) >= LEAK_MIN_OVERLAP
     evidence = _evidence(q.gold_chunk_ids, chunk_text)
+    # Check 2: ask the model whether the gold evidence answers the question and supports the answer.
     try:
         ev = complete_structured(
             client,
@@ -195,6 +212,7 @@ def screen_question(
             ),
             _EvidenceCheck,
         )
+    # If the model output is unusable, fail the question rather than guess.
     except (StructuredOutputError, RuntimeError) as exc:
         logger.warning("screen failed for %s: %s", q.qid, exc)
         return ScreenResult(
@@ -206,6 +224,8 @@ def screen_question(
             model=model,
         )
 
+    # Check 3 (multi-article questions only): ask about each article alone;
+    # if any one article is enough, the question is not really multi-hop.
     needs_multi: bool | None = None
     if len(q.article_ids) > 1:
         by_article: dict[str, list[str]] = defaultdict(list)
@@ -226,9 +246,11 @@ def screen_question(
                 needs_multi = False
                 break
 
+    # Verify the model's quote really appears in the evidence, so a "supported" needs real proof.
     quote = ev.support_quote.strip()
     quote_found = len(quote) >= 15 and partial_ratio(quote, evidence) >= QUOTE_MIN_RATIO
     passed = ev.answerable and ev.answer_supported and quote_found and not leaks
+    # Collect human-readable reasons for any failure and build the final verdict.
     problems = [
         msg
         for bad, msg in (
@@ -251,10 +273,12 @@ def screen_question(
     )
 
 
+# Order questions for human review so the most likely keepers come first.
 def review_order(questions: list[Question]) -> list[Question]:
     """Screen-passed questions first (multi-article before single), flagged ones last, so a
     time-boxed human review spends its time on the most likely keepers."""
 
+    # Sort key: passed before failed, multi-article before single, then by qid.
     def key(q: Question) -> tuple[int, int, str]:
         passed = q.screen is not None and q.screen.passed
         multi = q.screen is not None and bool(q.screen.needs_multiple_articles)

@@ -22,6 +22,7 @@ Used by: `fixgraph bench bridge-generate` (bench/cli.py).
 Uses: ingest.links (Link), bench.screen (content words, leak overlap), llm.structured.
 """
 
+# Imports: reuse the screen's word helpers and leak check, Apple links, and the LLM helper.
 import random
 import re
 from collections import defaultdict
@@ -41,12 +42,14 @@ from fixgraph.kg.validation import partial_ratio
 from fixgraph.llm.base import ChatMessage, LLMClient, LLMRequest
 from fixgraph.llm.structured import StructuredOutputError, complete_structured
 
+# Generation limits and thresholds, fixed before any system was run (D35).
 MAX_PER_SOURCE = 2
 _TOPIC = {stem(w) for w in TOPIC_WORDS}  # device / OS / app names are the topic, not a bridge
 LEAK_THRESHOLD = 0.6
 QUOTE_THRESHOLD = 0.85
 MAX_TARGET_CHUNKS = 3
 MAX_CHARS = 1500
+# A link only counts if its sentence is conditional ("if", "when", "unless").
 _CONDITIONAL = re.compile(r"\b(if|when|unless)\b", re.IGNORECASE)
 # Link wording that names no concept ("learn what to do", "get help").
 _GENERIC = content_words(
@@ -57,6 +60,7 @@ _GENERIC = content_words(
 )
 
 
+# One usable link from article A to article C, with C's first few chunks as answer material.
 class BridgeCandidate(BaseModel):
     link: Link
     source_title: str
@@ -64,6 +68,7 @@ class BridgeCandidate(BaseModel):
     target_chunk_ids: list[str]
 
 
+# Rules 1-2: pick conditional links, one per article pair, at most two per source article.
 def select_candidates(
     links: list[Link],
     titles: dict[str, str],
@@ -72,15 +77,18 @@ def select_candidates(
 ) -> list[BridgeCandidate]:
     """Rules 1-2. Deterministic for a given seed."""
     by_pair: dict[tuple[str, str], Link] = {}
+    # Keep the first conditional link per (source, target) pair whose target has chunks.
     for link in sorted(links, key=lambda x: (x.src_article, x.dst_article, x.src_chunk_id)):
         if not link.src_chunk_id or not _CONDITIONAL.search(link.sentence):
             continue
         if not chunks_by_article.get(link.dst_article):
             continue
         by_pair.setdefault((link.src_article, link.dst_article), link)
+    # Group the surviving links by source article.
     by_source: dict[str, list[Link]] = defaultdict(list)
     for (src, _), link in sorted(by_pair.items()):
         by_source[src].append(link)
+    # Seeded shuffle, then take up to MAX_PER_SOURCE links per source article.
     rng = random.Random(seed)
     out: list[BridgeCandidate] = []
     for src in sorted(by_source):
@@ -100,6 +108,7 @@ def select_candidates(
     return out
 
 
+# JSON shape the model returns: a bridge question, a direct question and one shared answer.
 class BridgePair(BaseModel):
     bridge_question: str
     direct_question: str
@@ -108,6 +117,7 @@ class BridgePair(BaseModel):
     answer_quote: str
 
 
+# Prompt: A's passage, the linking sentence and C's text; the model must not name the anchor.
 _PROMPT = """You write two customer questions for Apple Support that share one answer.
 
 Source article A: "{source_title}"
@@ -130,6 +140,7 @@ Write:
 Use natural customer wording. Do not mention articles, links or sources."""
 
 
+# Build the LLM request that asks for one bridge/direct question pair for a candidate link.
 def generation_request(cand: BridgeCandidate, chunk_text: dict[str, str], model: str) -> LLMRequest:
     target = "\n\n".join(chunk_text.get(c, "")[:MAX_CHARS] for c in cand.target_chunk_ids)
     prompt = _PROMPT.format(
@@ -148,6 +159,7 @@ def generation_request(cand: BridgeCandidate, chunk_text: dict[str, str], model:
     )
 
 
+# Outcome of generating one candidate: pass/fail, a reason, and the two questions if it passed.
 class BridgeResult(BaseModel):
     candidate: BridgeCandidate
     ok: bool
@@ -155,6 +167,7 @@ class BridgeResult(BaseModel):
     questions: list[Question] = []
 
 
+# Return anchor words that leak into the bridge question, ignoring generic and topic words.
 def anchor_leak(question: str, anchor: str, source_title: str) -> set[str]:
     """Anchor content words in the question, ignoring generic link wording and words the
     customer already has from A's title."""
@@ -162,6 +175,7 @@ def anchor_leak(question: str, anchor: str, source_title: str) -> set[str]:
     return (content_words(anchor) - allowed) & content_words(question)
 
 
+# Rules 3-4: code-only checks on a generated pair, then build the two Question objects.
 def check_pair(
     pair: BridgePair,
     cand: BridgeCandidate,
@@ -170,12 +184,14 @@ def check_pair(
     source: str = "bridge",
 ) -> BridgeResult:
     """Rules 3-4, all mechanical."""
+    # Find which C chunk contains the answer quote; that chunk becomes the gold answer chunk.
     quote_scores = {
         c: partial_ratio(pair.answer_quote, chunk_text.get(c, "")) for c in cand.target_chunk_ids
     }
     gold_c, score = max(quote_scores.items(), key=lambda x: x[1])
     if score < QUOTE_THRESHOLD:
         return BridgeResult(candidate=cand, ok=False, reason="answer quote not found in C")
+    # Reject if the bridge question names the link concept or repeats the answer's wording.
     leaked = anchor_leak(pair.bridge_question, cand.link.anchor, cand.source_title)
     if leaked:
         return BridgeResult(
@@ -183,6 +199,7 @@ def check_pair(
         )
     if leak_overlap(pair.bridge_question, [pair.answer]) >= LEAK_THRESHOLD:
         return BridgeResult(candidate=cand, ok=False, reason="bridge question leaks the answer")
+    # Shared fields; bridge gold is A's chunk plus C's chunk, direct gold is only C's chunk.
     facts = pair.key_facts[:3]
     common = {"gold_answer": pair.answer.strip(), "key_facts": facts, "source": source,
               "split": "test"}  # fmt: skip
@@ -203,6 +220,7 @@ def check_pair(
     return BridgeResult(candidate=cand, ok=True, reason="ok", questions=[bridge, direct])
 
 
+# Generate one pair with the LLM, then run the mechanical checks on it.
 def generate_pair(
     client: LLMClient,
     cand: BridgeCandidate,
@@ -222,6 +240,7 @@ def generate_pair(
 # ---------------------------------------------------------------------------
 
 
+# Mean with a bootstrap confidence interval, rounded for the report.
 def _ci(values: list[float]) -> dict[str, float]:
     from fixgraph.bench.stats import bootstrap_ci
 
@@ -229,6 +248,7 @@ def _ci(values: list[float]) -> dict[str, float]:
     return {"mean": round(c.mean, 3), "lo": round(c.lo, 3), "hi": round(c.hi, 3), "n": c.n}
 
 
+# Compare each system with the baseline on the same questions, then Holm-correct the p-values.
 def _tests(
     per: dict[str, dict[str, float]], baseline: str, keys: list[str]
 ) -> list[dict[str, object]]:
@@ -237,6 +257,7 @@ def _tests(
 
     rows: list[dict[str, object]] = []
     pvals: list[float] = []
+    # For each non-baseline system, test only questions both systems have scores for.
     for s in sorted(per):
         if s == baseline:
             continue
@@ -257,11 +278,13 @@ def _tests(
                 "d_z": round(paired_effect_size(a, b), 2),
             }
         )
+    # Attach the Holm-adjusted p-value to each row.
     for row, adj in zip(rows, holm(pvals), strict=True):
         row["p_holm"] = round(adj, 4)
     return rows
 
 
+# Build the bridge study report: hit rate and correctness per side, plus the cost of the hop.
 def bridge_report(
     questions: list[Question],
     ranked: dict[tuple[str, str], list[str]],
@@ -270,12 +293,14 @@ def bridge_report(
 ) -> dict[str, Any]:
     """`ranked[(qid, system)]` = retrieved chunk ids; `correctness[(qid, system)]` = judge
     score. Only complete pairs (both `a` and `d` present) are analysed."""
+    # Keep only complete pairs, where both the bridge (a) and direct (d) question exist.
     by_qid = {q.qid: q for q in questions}
     pairs = sorted(
         p for p in {q.qid[:-1] for q in questions} if f"{p}a" in by_qid and f"{p}d" in by_qid
     )
     systems = sorted({s for _, s in ranked} | {s for _, s in correctness})
     gold_c = {p: by_qid[f"{p}d"].gold_chunk_ids[0] for p in pairs}
+    # Per system, record whether the gold C chunk was in the top k and the judge score.
     hit: dict[str, dict[str, float]] = {s: {} for s in systems}
     corr: dict[str, dict[str, float]] = {s: {} for s in systems}
     for p in pairs:
@@ -289,9 +314,11 @@ def bridge_report(
     hit = {s: v for s, v in hit.items() if v}
     corr = {s: v for s, v in corr.items() if v}  # empty for retrieval-only runs
 
+    # Question ids for one side of every pair.
     def side_keys(side: str) -> list[str]:
         return [f"{p}{side}" for p in pairs]
 
+    # Summarise one metric for bridge vs direct questions and the hop cost, each tested against S1.
     def by_side(per: dict[str, dict[str, float]]) -> dict[str, Any]:
         out: dict[str, Any] = {}
         for side, name in (("a", "bridge"), ("d", "direct")):
@@ -311,6 +338,7 @@ def bridge_report(
         }
         return out
 
+    # Final report dict with both metrics; correctness is empty for retrieval-only runs.
     return {
         "n_pairs": len(pairs),
         "k": k,

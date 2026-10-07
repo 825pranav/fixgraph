@@ -1,6 +1,7 @@
 """`fixgraph index build` and `fixgraph bench run | report | ... | label-split |
 judge-calibrate`."""
 
+# Imports: typer for the CLI, plus the bench modules and the corpus readers they need.
 import json
 import logging
 from pathlib import Path
@@ -20,11 +21,13 @@ from fixgraph.core.models import Chunk
 from fixgraph.ingest.store import read_articles, read_chunks
 from fixgraph.retrieval.index import chunk_document
 
+# Two Typer apps: `fixgraph index ...` builds search indexes, `fixgraph bench ...` runs the harness.
 logger = logging.getLogger(__name__)
 index_app = typer.Typer(no_args_is_help=True, help="Search indexes (Qdrant local mode).")
 app = typer.Typer(no_args_is_help=True, help="TroubleshootQA benchmark.")
 
 
+# Load articles and chunks and build each chunk's document text (title + chunk text).
 def _chunk_docs(settings: Settings) -> tuple[dict[str, str], dict[str, str]]:
     """chunk_id -> indexed document (title + text), chunk_id -> text shown to the answer model."""
     paths = settings.paths
@@ -34,6 +37,7 @@ def _chunk_docs(settings: Settings) -> tuple[dict[str, str], dict[str, str]]:
     return docs, docs
 
 
+# CLI `index build`: embed all chunks and KG node names into the local Qdrant index.
 @index_app.command("build")
 def index_build() -> None:
     """Embed chunks (dense + BM25) and KG node names into Qdrant local mode."""
@@ -43,17 +47,20 @@ def index_build() -> None:
     from fixgraph.kg.store import read_kg
     from fixgraph.retrieval.index import build_chunk_index, build_node_index, open_client
 
+    # Load settings, article titles and chunks, then open the embedder and the Qdrant client.
     settings = load_settings()
     paths = settings.paths
     titles = {a.article_id: a.title for a in read_articles(paths.articles)}
     chunks = read_chunks(paths.chunks)
     embedder = SentenceTransformerEmbedder()
     client = open_client(paths.index)
+    # Index chunks first (dense + BM25), then KG node names if a graph has been built.
     try:
         build_chunk_index(client, chunks, titles, embedder, paths.index)
         if (paths.kg / "nodes.parquet").exists():
             kg = read_kg(paths.kg)
             nodes = kg.nodes.filter(pl.col("label") != "Article")
+            # Node names come from canonical text plus every surface form seen in the text.
             names = {
                 (r["node_id"], r["label"], r["canonical_text"]) for r in nodes.iter_rows(named=True)
             }
@@ -62,15 +69,18 @@ def index_build() -> None:
                 if nid in labels:
                     names.add((nid, labels[nid], surface))  # surface forms act as aliases
             build_node_index(client, sorted(names), embedder)
+    # Always close the client and free the embedder's GPU memory, even on error.
     finally:
         client.close()
         embedder.release()
     typer.echo(f"indexed {len(chunks)} chunks -> {paths.index}")
 
 
+# Shared help text for the --questions filter option.
 _WHICH_HELP = "all | screened (auto-screen passed or verified) | verified (see verified_by)."
 
 
+# Read the question file, apply the all/screened/verified filter, and optionally truncate.
 def _load_questions(questions_file: str, which: str, limit: int | None) -> list[Question]:
     if which not in get_args(QuestionFilter):
         raise typer.BadParameter(f"--questions must be one of {get_args(QuestionFilter)}")
@@ -78,6 +88,7 @@ def _load_questions(questions_file: str, which: str, limit: int | None) -> list[
     return selected[: limit or None]
 
 
+# Free an Ollama model from GPU memory so the next stage's model can load.
 def _unload(settings: Settings, model: str) -> None:
     if settings.llm.backend == "ollama":
         from fixgraph.llm.ollama import OllamaClient
@@ -87,6 +98,7 @@ def _unload(settings: Settings, model: str) -> None:
         c.close()
 
 
+# CLI `bench run`: run the chosen stages in order; each stage reads the previous stage's JSONL.
 @app.command("run")
 def bench_run(
     questions_file: str = typer.Option("data/bench/dev_handwritten.jsonl"),
@@ -102,6 +114,7 @@ def bench_run(
     """Run benchmark stages; one heavy model on the GPU at a time."""
     from fixgraph.llm.factory import build_llm_client
 
+    # Load settings and questions, and parse the system and stage lists from the options.
     settings = load_settings()
     paths = settings.paths
     questions = _load_questions(questions_file, which, limit)
@@ -111,6 +124,7 @@ def bench_run(
     _, chunk_text = _chunk_docs(settings)
     answer_model, judge_model = settings.llm.answer_model, settings.llm.judge_model
 
+    # Stage 1: extract question mentions with the linking model, then unload it.
     if "mentions" in stage_list:
         client = build_llm_client(settings)
         try:
@@ -119,10 +133,12 @@ def bench_run(
             client.close()
             _unload(settings, settings.llm.linking_model)
 
+    # Stage 2: run every retrieval system (see _retrieve below).
     if "retrieve" in stage_list:
         retrievals = _retrieve(settings, questions, system_list, out, type_weights, kg_dir)
         logger.info("retrieved %d rows", len(retrievals))
 
+    # Stage 3: read saved retrievals and generate answers with the answer model.
     if "answer" in stage_list:
         retrievals = [R.RetrievalRow.model_validate(r) for r in R._read(out / "retrieval.jsonl")]
         client = build_llm_client(settings)
@@ -140,6 +156,7 @@ def bench_run(
             client.close()
             _unload(settings, answer_model)
 
+    # Stage 4: read saved answers and run the verifier plus judge with the judge model.
     if "judge" in stage_list:
         answers = [R.AnswerRow.model_validate(r) for r in R._read(out / "answers.jsonl")]
         client = build_llm_client(settings)
@@ -159,10 +176,12 @@ def bench_run(
             client.close()
             _unload(settings, judge_model)
 
+    # Stage 5: build the report from the saved files.
     if "report" in stage_list:
         report_(run_name=run_name, questions_file=questions_file, limit=limit, which=which)
 
 
+# Build the requested retrievers (S0..S4) and run stage_retrieve over all questions.
 def _retrieve(
     settings: Settings,
     questions: list[Question],
@@ -182,6 +201,7 @@ def _retrieve(
     from fixgraph.retrieval.linking import EntityLinker, merge_mentions, rule_mentions
     from fixgraph.retrieval.rerank import CrossEncoderReranker
 
+    # Load the models and index shared by every system; S1 (hybrid) is reused by the graph systems.
     paths = settings.paths
     docs, _ = _chunk_docs(settings)
     embedder = SentenceTransformerEmbedder()
@@ -192,6 +212,7 @@ def _retrieve(
         systems: dict[str, Retriever] = {}
         if "S1" in system_list:
             systems["S1"] = hybrid
+        # Graph systems need the KG, the graph index, an entity linker and per-question mentions.
         if {"S2", "S3", "S2L", "S4"} & set(system_list):
             kg = read_kg(Path(kg_dir) if kg_dir else paths.kg)
             graph = build_graph_index(kg, use_type_weights=type_weights)
@@ -205,10 +226,12 @@ def _retrieve(
                 )
                 for q in questions
             }
+            # S2 = personalised PageRank over the KG; S3 = path-based graph retriever.
             if "S2" in system_list:
                 systems["S2"] = PPRRetriever(graph, linker, hybrid, mentions)
             if "S3" in system_list:
                 systems["S3"] = PathRetriever(graph, linker, hybrid, mentions)
+            # S2L adds Apple's article links as a document layer; S4 fuses S1 with S2L.
             if {"S2L", "S4"} & set(system_list):
                 from fixgraph.bench.schema import article_of
                 from fixgraph.ingest.links import read_links
@@ -228,15 +251,18 @@ def _retrieve(
                     systems["S2L"] = s2l
                 if "S4" in system_list:
                     systems["S4"] = FusionRetriever(hybrid, s2l)
+        # S0 is the closed-book baseline that retrieves nothing.
         if "S0" in system_list:
             systems["S0"] = NoRetrieval()
         return R.stage_retrieve(questions, systems, out / "retrieval.jsonl")
+    # Free GPU memory once retrieval is done.
     finally:
         client.close()
         reranker.release()
         embedder.release()
 
 
+# CLI `bench report`: read a run's JSONL files, compute metrics/CIs/tests, write JSON + Markdown.
 @app.command("report")
 def report_(
     run_name: str = typer.Option("dev"),
@@ -245,6 +271,7 @@ def report_(
     which: str = typer.Option("all", "--questions", help=_WHICH_HELP),
 ) -> None:
     """Metrics with bootstrap CIs, significance tests, per-type table; logs to MLflow."""
+    # Load the run's retrieval, answer and judge rows and build the report.
     settings = load_settings()
     out = settings.paths.results / run_name
     questions = _load_questions(questions_file, which, limit)
@@ -252,16 +279,19 @@ def report_(
     answers = [R.AnswerRow.model_validate(r) for r in R._read(out / "answers.jsonl")]
     judged = [R.JudgeRow.model_validate(r) for r in R._read(out / "judged.jsonl")]
     report = R.build_report(questions, retrievals, answers, judged)
+    # Record which judge prompt was used (old runs default to v1).
     meta = out / "judge_meta.json"
     report["judge"] = (
         json.loads(meta.read_text(encoding="utf-8"))
         if meta.exists()
         else {"model": settings.llm.judge_model, "variant": "v1"}  # runs judged before D33
     )
+    # Write report.json and report.md for this question filter.
     stem = "report" if which == "all" else f"report_{which}"  # one file per question filter
     (out / f"{stem}.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     md = R.render_markdown(report)
     (out / f"{stem}.md").write_text(md, encoding="utf-8")
+    # Also log the metrics to MLflow for tracking across runs.
     try:
         import mlflow
 
@@ -285,6 +315,7 @@ DEFAULT_MIX = (
 )
 
 
+# Turn the mix string from the CLI into a per-type count dict.
 def _parse_mix(mix: str) -> dict[str, int]:
     """Parse `single_hop=40,multi_constraint=80` into {"single_hop": 40, "multi_constraint": 80}."""
     out: dict[str, int] = {}
@@ -294,6 +325,7 @@ def _parse_mix(mix: str) -> dict[str, int]:
     return out
 
 
+# CLI `bench generate`: sample KG paths and have the LLM write a question for each.
 @app.command("generate")
 def bench_generate(
     mix: str = typer.Option(DEFAULT_MIX, help="Paths per question type, e.g. single_hop=40,..."),
@@ -305,11 +337,13 @@ def bench_generate(
     from fixgraph.kg.store import read_kg
     from fixgraph.llm.factory import build_llm_client
 
+    # Sample paths from the KG with the requested per-type counts.
     settings = load_settings()
     _, chunk_text = _chunk_docs(settings)
     samples = sample_paths(read_kg(settings.paths.kg), _parse_mix(mix), seed=settings.seed)
     client = build_llm_client(settings)
     qs = []
+    # Generate one question per path; failed generations are skipped.
     try:
         for i, s in enumerate(tqdm(samples, desc="generate")):
             q = generate_question(client, s, chunk_text, settings.llm.judge_model, f"t{i:03d}")
@@ -322,6 +356,7 @@ def bench_generate(
     typer.echo(f"{len(qs)} questions from {len(samples)} paths -> {out_file}")
 
 
+# CLI `bench screen`: run the automatic pre-screen on generated questions and save verdicts.
 @app.command("screen")
 def bench_screen(
     questions_file: str = typer.Option("data/bench/generated.jsonl"),
@@ -337,6 +372,7 @@ def bench_screen(
     from fixgraph.kg.store import read_kg
     from fixgraph.llm.factory import build_llm_client
 
+    # Load chunk text and node text (for the leak check), then the questions.
     settings = load_settings()
     _, chunk_text = _chunk_docs(settings)
     nodes = read_kg(settings.paths.kg).nodes
@@ -344,6 +380,7 @@ def bench_screen(
     path = Path(questions_file)
     qs = read_questions(path)
     client = build_llm_client(settings)
+    # Screen each question that has no verdict yet (or all, with --rescreen).
     try:
         for i, q in enumerate(tqdm(qs, desc="screen")):
             if q.screen is None or rescreen:
@@ -358,6 +395,7 @@ def bench_screen(
     finally:
         client.close()
         _unload(settings, settings.llm.judge_model)
+    # Sort for review (passed first), save, and print a pass count per question type.
     qs = review_order(qs)
     write_questions(qs, path)
     passed = Counter(q.qtype for q in qs if q.screen and q.screen.passed)
@@ -365,6 +403,7 @@ def bench_screen(
     typer.echo(f"passed {sum(passed.values())}/{len(qs)} ({dict(passed)}); {multi} need >1 article")
 
 
+# CLI `bench verify`: walk a human through approving or rejecting generated questions.
 @app.command("verify")
 def bench_verify(
     questions_file: str = typer.Option("data/bench/generated.jsonl"),
@@ -385,6 +424,7 @@ def bench_verify(
     typer.echo(f"verified {n}; {sum(q.verified for q in qs)}/{len(qs)} verified in file")
 
 
+# CLI `bench label`: a human blindly grades a sample of a run's answers to check the judge.
 @app.command("label")
 def bench_label(
     run_name: str = typer.Option("dev"),
@@ -403,6 +443,7 @@ def bench_label(
         write_labels,
     )
 
+    # Load the run's answers and judge scores, sample answers to grade, then run the label loop.
     settings = load_settings()
     run_dir = settings.paths.results / run_name
     questions = {q.qid: q for q in _load_questions(questions_file, which, None)}
@@ -417,10 +458,12 @@ def bench_label(
         lambda x: write_labels(x, labels_path),
         labeler,
     )
+    # Show how well the judge agreed with the human labels so far.
     if labels:
         typer.echo(agreement(labels, judged).model_dump_json(indent=2))
 
 
+# CLI `bench kappa`: print judge-vs-human agreement for a run without labelling more.
 @app.command("kappa")
 def bench_kappa(run_name: str = typer.Option("dev")) -> None:
     """Cohen's kappa between human labels and the LLM judge for a run."""
@@ -434,11 +477,13 @@ def bench_kappa(run_name: str = typer.Option("dev")) -> None:
 
 # --- judge calibration (D33) ----------------------------------------------------------------
 
+# Calibration inputs: which run's labels, the frozen split file, and the results log.
 _LABEL_RUN = "test"  # the run whose blind labels calibrate the judge
 _SPLIT_FILE = "judge_label_split_test.json"
 _CALIBRATION = Path("results/judge/calibration.json")
 
 
+# Validate a judge prompt name from the CLI.
 def _judge_variant(name: str) -> JudgeVariant:
     from fixgraph.bench.judge import VARIANTS
 
@@ -447,10 +492,12 @@ def _judge_variant(name: str) -> JudgeVariant:
     return cast(JudgeVariant, name)
 
 
+# Build the v4 few-shot examples from the labelled dev items of the calibration run.
 def _judge_examples(settings: Settings) -> list[JudgeExample]:
     """v4 worked examples: fixed dev items of the calibration split (see pick_examples)."""
     from fixgraph.bench.validate import LabelSplit, load_run, pick_examples, read_labels
 
+    # Load labels, the frozen split, the run's answers and the questions.
     paths = settings.paths
     labels = read_labels(paths.bench / f"judge_labels_{_LABEL_RUN}.jsonl")
     split = LabelSplit.model_validate_json((paths.bench / _SPLIT_FILE).read_text(encoding="utf-8"))
@@ -458,6 +505,7 @@ def _judge_examples(settings: Settings) -> list[JudgeExample]:
     questions = {q.qid: q for q in read_questions(paths.bench / "generated.jsonl")}
     score = {(x.qid, x.system): x.score for x in labels}
     out = []
+    # Turn each chosen (qid, system) into a JudgeExample with its question, answer and human score.
     for qid, system in pick_examples(labels, split.dev):
         q = questions[qid]
         out.append(
@@ -472,6 +520,7 @@ def _judge_examples(settings: Settings) -> list[JudgeExample]:
     return out
 
 
+# CLI `bench label-split`: fix the dev/heldout split of human labels once, then never change it.
 @app.command("label-split")
 def label_split(seed: int = typer.Option(13)) -> None:
     """Fix which judge labels may be used to design prompts (dev, 1/3) vs held out (2/3)."""
@@ -486,6 +535,7 @@ def label_split(seed: int = typer.Option(13)) -> None:
     typer.echo(f"dev {len(split.dev)} / heldout {len(split.heldout)} -> {target}")
 
 
+# CLI `bench judge-calibrate`: score judge prompt variants against human labels on one split.
 @app.command("judge-calibrate")
 def judge_calibrate(
     variants: list[str] = typer.Option(..., "--variant", help="Repeatable: v1 v2 v3 v4."),
@@ -497,6 +547,7 @@ def judge_calibrate(
     from fixgraph.bench.validate import LabelSplit, agreement, load_run, pick_examples, read_labels
     from fixgraph.llm.factory import build_llm_client
 
+    # Guard rails: heldout can only be scored once, and with exactly one chosen variant.
     settings = load_settings()
     paths = settings.paths
     if split_name not in ("dev", "heldout"):
@@ -506,12 +557,14 @@ def judge_calibrate(
         raise typer.BadParameter("the held-out split was already scored (D33: once only)")
     if split_name == "heldout" and len(variants) != 1:
         raise typer.BadParameter("score exactly one chosen variant on the held-out split")
+    # Load labels, the split's keys, the run's answers and the questions.
     labels = read_labels(paths.bench / f"judge_labels_{_LABEL_RUN}.jsonl")
     split = LabelSplit.model_validate_json((paths.bench / _SPLIT_FILE).read_text(encoding="utf-8"))
     keys = set(split.dev if split_name == "dev" else split.heldout)
     answers, _ = load_run(paths.results / _LABEL_RUN)
     questions = {q.qid: q for q in read_questions(paths.bench / "generated.jsonl")}
     client = build_llm_client(settings)
+    # For each variant: re-judge every labelled answer (minus v4's examples) and measure agreement.
     try:
         for name in variants:
             variant = _judge_variant(name)
@@ -526,6 +579,7 @@ def judge_calibrate(
                 )  # fmt: skip
                 scores[(qid, system)] = out.score
             ag = agreement([x for x in labels if (x.qid, x.system) in scores], scores)
+            # Append this variant's agreement numbers to the calibration log.
             entry = {
                 "variant": variant,
                 "split": split_name,
@@ -538,16 +592,19 @@ def judge_calibrate(
     finally:
         client.close()
         _unload(settings, settings.llm.judge_model)
+    # Save the full calibration log to disk.
     _CALIBRATION.parent.mkdir(parents=True, exist_ok=True)
     _CALIBRATION.write_text(json.dumps(log, indent=2) + "\n", encoding="utf-8")
 
 
 # --- bridge benchmark (D35) -------------------------------------------------------------------
 
+# Bridge question file and the freeze record that blocks regeneration.
 _BRIDGE_FILE = "data/bench/bridge.jsonl"
 _BRIDGE_FROZEN = Path("results/bridge/frozen.json")
 
 
+# CLI `bench bridge-generate`: build bridge/direct question pairs from Apple's conditional links.
 @app.command("bridge-generate")
 def bridge_generate(out_file: str = typer.Option(_BRIDGE_FILE)) -> None:
     """Matched bridge / direct question pairs from Apple's conditional links (D35 rule)."""
@@ -558,6 +615,7 @@ def bridge_generate(out_file: str = typer.Option(_BRIDGE_FILE)) -> None:
     from fixgraph.ingest.links import read_links
     from fixgraph.llm.factory import build_llm_client
 
+    # Refuse to regenerate a frozen set; then load chunk text, titles and chunks per article.
     settings = load_settings()
     paths = settings.paths
     if _BRIDGE_FROZEN.exists():
@@ -567,6 +625,7 @@ def bridge_generate(out_file: str = typer.Option(_BRIDGE_FILE)) -> None:
     by_article: dict[str, list[str]] = defaultdict(list)
     for c in read_chunks(paths.chunks):
         by_article[c.article_id].append(c.chunk_id)
+    # Select candidate links by the fixed rule, then generate and check one pair per candidate.
     cands = select_candidates(read_links(paths.corpus / "links.parquet"), titles, by_article,
                               seed=settings.seed)  # fmt: skip
     client = build_llm_client(settings)
@@ -579,6 +638,7 @@ def bridge_generate(out_file: str = typer.Option(_BRIDGE_FILE)) -> None:
     finally:
         client.close()
         _unload(settings, settings.llm.judge_model)
+    # Save surviving questions and a log of how many candidates were kept or rejected and why.
     qs = [q for r in results for q in r.questions]
     write_questions(qs, Path(out_file))
     log = Path("results/bridge/generation.json")
@@ -606,11 +666,13 @@ def bridge_generate(out_file: str = typer.Option(_BRIDGE_FILE)) -> None:
     typer.echo(f"{sum(r.ok for r in results)}/{len(cands)} pairs -> {out_file}")
 
 
+# CLI `bench bridge-freeze`: hash and count the reviewed set so it cannot change silently.
 @app.command("bridge-freeze")
 def bridge_freeze(questions_file: str = typer.Option(_BRIDGE_FILE)) -> None:
     """Freeze the reviewed bridge set: record its SHA-256 and counts before any system runs."""
     import hashlib
 
+    # Only freeze once, and only if review kept or dropped each pair as a whole.
     if _BRIDGE_FROZEN.exists():
         raise typer.BadParameter(f"already frozen: {_BRIDGE_FROZEN}")
     raw = Path(questions_file).read_bytes()
@@ -620,6 +682,7 @@ def bridge_freeze(questions_file: str = typer.Option(_BRIDGE_FILE)) -> None:
     complete = {p for p in pairs if {f"{p}a", f"{p}d"} <= {q.qid for q in kept}}
     if len(complete) != len(pairs):
         raise typer.BadParameter("review must keep or drop pairs as a unit")
+    # Write the SHA-256 and counts to the frozen record.
     _BRIDGE_FROZEN.parent.mkdir(parents=True, exist_ok=True)
     _BRIDGE_FROZEN.write_text(
         json.dumps(
@@ -638,6 +701,7 @@ def bridge_freeze(questions_file: str = typer.Option(_BRIDGE_FILE)) -> None:
     typer.echo(f"frozen {len(complete)} verified pairs ({_BRIDGE_FROZEN})")
 
 
+# CLI `bench bridge-report`: score a run on the bridge set (hit@8, correctness, hop cost).
 @app.command("bridge-report")
 def bridge_report_cmd(
     run_name: str = typer.Option("bridge"),
@@ -647,6 +711,7 @@ def bridge_report_cmd(
     """Answer-chunk hit@8, correctness, hop cost and crossover tests on verified pairs (D35)."""
     from fixgraph.bench.bridge import bridge_report
 
+    # Load verified bridge questions and the run's ranked chunks per (qid, system).
     settings = load_settings()
     run_dir = settings.paths.results / run_name
     qs = [q for q in read_questions(Path(questions_file)) if q.verified]
@@ -655,11 +720,13 @@ def bridge_report_cmd(
         for r in R._read(run_dir / "retrieval.jsonl")
     }
     judged_file = run_dir / "judged.jsonl"  # optional: retrieval-only runs have no judge stage
+    # Judge scores are optional; retrieval-only runs just get the hit@8 analysis.
     judged = (
         {(r["qid"], r["system"]): float(r["judge"]["score"]) for r in R._read(judged_file)}
         if judged_file.exists()
         else {}
     )
+    # Build the report, attach judge and freeze metadata, then save and print it.
     report = bridge_report(qs, ranked, judged)
     meta = run_dir / "judge_meta.json"
     if meta.exists():
@@ -672,6 +739,7 @@ def bridge_report_cmd(
     typer.echo(json.dumps(report, indent=2))
 
 
+# CLI `bench bridge-import`: run externally written pairs through the same mechanical checks.
 @app.command("bridge-import")
 def bridge_import(
     candidates_file: str = typer.Option(..., help="JSON list of BridgeCandidate (seeded rule)."),
@@ -684,16 +752,19 @@ def bridge_import(
 
     if _BRIDGE_FROZEN.exists():
         raise typer.BadParameter("the bridge set is frozen (D35)")
+    # Load chunk text and the candidate list, numbered b000, b001, ... like generation does.
     settings = load_settings()
     _, chunk_text = _chunk_docs(settings)
     raw = json.loads(Path(candidates_file).read_text(encoding="utf-8"))
     cands = {f"b{i:03d}": BridgeCandidate.model_validate(c) for i, c in enumerate(raw)}
     written: dict[str, dict[str, object]] = {}
+    # Read all written pairs, keyed by pair id.
     for f in pairs_files:
         for line in Path(f).read_text(encoding="utf-8").splitlines():
             if line.strip():
                 row = json.loads(line)
                 written[row["pid"]] = row
+    # Check each candidate's pair; missing or skipped ones are recorded as rejections.
     results: list[BridgeResult] = []
     for pid, cand in cands.items():
         row = written.get(pid)
@@ -703,6 +774,7 @@ def bridge_import(
             continue
         pair = BridgePair.model_validate({k: row[k] for k in BridgePair.model_fields})
         results.append(check_pair(pair, cand, chunk_text, pid, source="bridge-claude"))
+    # Save passing questions and a generation log, same format as bridge-generate.
     write_questions([q for r in results for q in r.questions], Path(out_file))
     log = Path("results/bridge/generation.json")
     log.parent.mkdir(parents=True, exist_ok=True)
@@ -729,6 +801,7 @@ def bridge_import(
 # --- graph + hybrid combinations (D37+) ---------------------------------------------------------
 
 
+# CLI `bench miss-analysis`: where S1 misses gold chunks and which graph routes could reach them.
 @app.command("miss-analysis")
 def miss_analysis_cmd(
     kg_dir: str = typer.Option("data/kg_verified"),
@@ -740,12 +813,14 @@ def miss_analysis_cmd(
     from fixgraph.kg.store import read_kg
     from fixgraph.retrieval.graph import build_graph_index
 
+    # Build the graph index, Apple links and the route expander once.
     settings = load_settings()
     paths = settings.paths
     graph = build_graph_index(read_kg(Path(kg_dir)))
     links = [(x.src_article, x.dst_article) for x in read_links(paths.corpus / "links.parquet")]
     exp = Expander(graph, links, [c.chunk_id for c in read_chunks(paths.chunks)])
     report: dict[str, object] = {"kg_dir": kg_dir}
+    # Run the analysis on the main and bridge question sets using S1's saved rankings.
     for name, qfile, run in (
         ("main93", "data/bench/generated.jsonl", "test_verified"),
         ("bridge156", _BRIDGE_FILE, "bridge"),
@@ -757,6 +832,7 @@ def miss_analysis_cmd(
             if r["system"] == "S1"
         }
         report[name] = miss_analysis(qs, ranked, exp)
+    # Save the report and print a short summary per set.
     Path(out).parent.mkdir(parents=True, exist_ok=True)
     Path(out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     for name in ("main93", "bridge156"):
@@ -770,10 +846,12 @@ def miss_analysis_cmd(
                 for k, v in routes.items()))  # fmt: skip
 
 
+# Combination study outputs live here; it uses the verified main and bridge question sets.
 _COMBO = Path("results/combo")
 _COMBO_SETS = (("data/bench/generated.jsonl", "main"), (_BRIDGE_FILE, "bridge"))
 
 
+# Load all verified main + bridge questions, optionally only those in the frozen dev or test split.
 def _combo_questions(split: str | None = None) -> list[Question]:
     qs = [q for f, _ in _COMBO_SETS for q in read_questions(Path(f)) if q.verified]
     if split is None:
@@ -782,6 +860,7 @@ def _combo_questions(split: str | None = None) -> list[Question]:
     return [q for q in qs if assignment[q.qid] == split]
 
 
+# CLI `bench combo-split`: make the one-time dev/test split and store a hash of the test ids.
 @app.command("combo-split")
 def combo_split(seed: int = typer.Option(13)) -> None:
     """Seeded 60/40 dev/test split of the 93 main + 156 bridge questions; hash-freezes test."""
@@ -789,11 +868,13 @@ def combo_split(seed: int = typer.Option(13)) -> None:
 
     from fixgraph.bench.combo import split_questions
 
+    # Refuse if a split already exists; the split is created exactly once.
     target = _COMBO / "split.json"
     if target.exists():
         raise typer.BadParameter(f"{target} exists; the split is fixed once (D37)")
     qs = _combo_questions()
     assignment = split_questions(qs, seed=seed)
+    # Count questions per type and side, then save seed, test hash, counts and the full assignment.
     test_ids = sorted(q for q, s in assignment.items() if s == "test")
     counts: dict[str, dict[str, int]] = {}
     for q in qs:
@@ -815,6 +896,7 @@ def combo_split(seed: int = typer.Option(13)) -> None:
     typer.echo(json.dumps(counts))
 
 
+# CLI `bench combo-cache`: run the one GPU pass for a split and save CacheRows as JSONL.
 @app.command("combo-cache")
 def combo_cache(split: str = typer.Option(..., help="dev | test")) -> None:
     """One GPU pass: fused candidates, cross-encoder scores for S1's pool and the Apple-link
@@ -826,8 +908,10 @@ def combo_cache(split: str = typer.Option(..., help="dev | test")) -> None:
     from fixgraph.retrieval.index import load_bm25, open_client
     from fixgraph.retrieval.rerank import CrossEncoderReranker
 
+    # Test cache is only allowed after the finalists are recorded, to avoid peeking.
     if split == "test" and not (_COMBO / "finalists.json").exists():
         raise typer.BadParameter("record the finalists (D38) before touching the test split")
+    # Load chunk docs, Apple links and models; build the cache with the S1 hybrid retriever.
     settings = load_settings()
     paths = settings.paths
     docs, _ = _chunk_docs(settings)
@@ -841,18 +925,21 @@ def combo_cache(split: str = typer.Option(..., help="dev | test")) -> None:
         client.close()
         reranker.release()
         embedder.release()
+    # Save one cached row per question.
     out = paths.results / "combo" / f"cache_{split}.jsonl"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("".join(r.model_dump_json() + "\n" for r in rows), encoding="utf-8")
     typer.echo(f"{len(rows)} questions cached -> {out}")
 
 
+# Load a split's cached rows, keyed by question id.
 def _combo_rows(split: str) -> dict[str, CacheRow]:
     path = load_settings().paths.results / "combo" / f"cache_{split}.jsonl"
     rows = [CacheRow.model_validate_json(x) for x in path.read_text(encoding="utf-8").splitlines()]
     return {r.qid: r for r in rows}
 
 
+# CLI `bench combo-dev`: score S1 and every grid config on dev using only the cache.
 @app.command("combo-dev")
 def combo_dev() -> None:
     """Score S1 and every D37 grid config on the dev split; log all of them."""
@@ -860,10 +947,12 @@ def combo_dev() -> None:
 
     from fixgraph.bench.combo import Config, grid, per_question, rank, recovered_broken, summarize
 
+    # Routing threshold = median of S1's top cross-encoder score on dev.
     qs = _combo_questions("dev")
     rows = _combo_rows("dev")
     threshold = median(rows[q.qid].ce[rows[q.qid].s1[0]] for q in qs)
     s1 = {q.qid: rank(rows[q.qid], Config(kind="s1"), threshold) for q in qs}
+    # Evaluate S1 and every grid config and log metrics plus recovered/broken counts.
     log = []
     for cfg in [Config(kind="s1"), *grid()]:
         r = {q.qid: rank(rows[q.qid], cfg, threshold) for q in qs}
@@ -876,6 +965,7 @@ def combo_dev() -> None:
             "broken": sum(v["broken"] for v in rb.values()),
             "recovered_broken_by_type": rb,
         })  # fmt: skip
+    # Save the dev log and print a one-line summary per config.
     (_COMBO / "dev_log.json").write_text(
         json.dumps({"route_threshold": threshold, "n_dev": len(qs), "configs": log}, indent=2)
         + "\n",
@@ -890,6 +980,7 @@ def combo_dev() -> None:
         )
 
 
+# CLI `bench combo-test`: the single locked test run of S1 vs the recorded finalists.
 @app.command("combo-test")
 def combo_test(out: str = typer.Option("results/combo/test_report.json")) -> None:
     """The single locked-test run of S1 vs the recorded finalists (D38). Refuses to rerun."""
@@ -897,6 +988,7 @@ def combo_test(out: str = typer.Option("results/combo/test_report.json")) -> Non
 
     from fixgraph.bench.combo import Config, test_report
 
+    # Refuse to rerun, and check the test questions still match the frozen hash.
     if Path(out).exists():
         raise typer.BadParameter(f"{out} exists; the test split is evaluated once (D38)")
     fin = json.loads((_COMBO / "finalists.json").read_text(encoding="utf-8"))
@@ -905,6 +997,7 @@ def combo_test(out: str = typer.Option("results/combo/test_report.json")) -> Non
     ids = "\n".join(sorted(q.qid for q in qs)).encode()
     if hashlib.sha256(ids).hexdigest() != split["test_sha256"]:
         raise typer.BadParameter("test questions do not match the frozen split hash")
+    # Score the finalists on the test cache and save the report.
     report = test_report(qs, _combo_rows("test"), [Config(**c) for c in fin["finalists"]],
                          fin["route_threshold"])  # fmt: skip
     report["finalists"] = fin
@@ -915,18 +1008,22 @@ def combo_test(out: str = typer.Option("results/combo/test_report.json")) -> Non
 
 # --- reranking study (D39) ----------------------------------------------------------------------
 
+# Reranking study outputs folder.
 _RR = Path("results/rerank")
 
 
+# Path of the reranking study cache for a split.
 def _rr_cache_path(split: str) -> Path:
     return load_settings().paths.results / "rerank" / f"cache_{split}.jsonl"
 
 
+# Load a split's reranking cache rows, keyed by question id.
 def _rr_rows(split: str) -> dict[str, StudyRow]:
     lines = _rr_cache_path(split).read_text(encoding="utf-8").splitlines()
     return {r.qid: r for r in (StudyRow.model_validate_json(x) for x in lines)}
 
 
+# CLI `bench rr-cache`: cache top-100 candidates and every reranker's scores for a split.
 @app.command("rr-cache")
 def rr_cache(
     split: str = typer.Option(..., help="dev | test"),
@@ -941,6 +1038,7 @@ def rr_cache(
     from fixgraph.retrieval.index import load_bm25, open_client
     from fixgraph.retrieval.rerank import CrossEncoderReranker
 
+    # Test cache is only allowed after a config is selected on dev.
     if split == "test" and not (_RR / "selected.json").exists():
         raise typer.BadParameter("select the configuration on dev (D39) before the test split")
     settings = load_settings()
@@ -949,6 +1047,7 @@ def rr_cache(
     qs = _combo_questions(split)
     out = _rr_cache_path(split)
     rows = _rr_rows(split) if out.exists() else {}
+    # Step 1 (only if needed): run first-stage search once per question and time it.
     if len(rows) < len(qs):
         import time
 
@@ -966,6 +1065,7 @@ def rr_cache(
         finally:
             client.close()
             embedder.release()
+    # Step 2: for each reranker, score all candidates per question, one model on the GPU at a time.
     for name in scorers.split(","):
         todo = [q for q in qs if name not in rows[q.qid].scores]
         if not todo:
@@ -980,6 +1080,7 @@ def rr_cache(
                 )
         finally:
             reranker.release()
+        # Save after each reranker so a crash does not lose finished work.
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text("".join(rows[q.qid].model_dump_json() + "\n" for q in qs), encoding="utf-8")
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -987,11 +1088,13 @@ def rr_cache(
     typer.echo(f"{len(qs)} questions cached -> {out}")
 
 
+# CLI `bench rr-dev`: evaluate the reranking grid on dev, log it and print the selection.
 @app.command("rr-dev")
 def rr_dev(scorers: str = typer.Option("bge,bge1024,qwen,qwents")) -> None:
     """Score the D39 grid on the dev split, log every configuration, record the selection."""
     from fixgraph.bench.rerank_study import StudyConfig, evaluate, grid, select
 
+    # Baseline is the S1 reranker (bge) over a 30-chunk pool.
     qs = _combo_questions("dev")
     rows = _rr_rows("dev")
     baseline = StudyConfig(scorer="bge", pool=30)
@@ -1014,6 +1117,7 @@ def rr_dev(scorers: str = typer.Option("bge,bge1024,qwen,qwents")) -> None:
 # --- reranker fine-tuning on out-of-corpus synthetic queries (D40) -------------------------------
 
 
+# Load chunks from articles outside the working corpus, used as fine-tuning data.
 def _outside_corpus(settings: Settings) -> tuple[list[Chunk], dict[str, str]]:
     """Chunks of scraped articles outside the 500-chunk working set, and their documents."""
     paths = settings.paths
@@ -1025,6 +1129,7 @@ def _outside_corpus(settings: Settings) -> tuple[list[Chunk], dict[str, str]]:
     return chunks, {c.chunk_id: chunk_document(c, titles.get(c.article_id, "")) for c in chunks}
 
 
+# CLI `bench ft-synth`: build synthetic training groups for reranker fine-tuning.
 @app.command("ft-synth")
 def ft_synth(
     n: int = typer.Option(600, help="chunks to write one query for"),
@@ -1035,6 +1140,7 @@ def ft_synth(
     from fixgraph.llm.factory import build_llm_client
     from fixgraph.retrieval.finetune import SynthPair, mine_negatives, sample_chunks, synth_question
 
+    # Pick out-of-corpus chunks and have the LLM write one question for each.
     settings = load_settings()
     chunks, docs = _outside_corpus(settings)
     titles = {a.article_id: a.title for a in read_articles(settings.paths.corpus /
@@ -1051,6 +1157,7 @@ def ft_synth(
     finally:
         client.close()
         _unload(settings, model)
+    # Embed all outside chunks and the synthetic questions to mine hard negatives.
     embedder = SentenceTransformerEmbedder()
     try:
         ids = list(docs)
@@ -1059,6 +1166,7 @@ def ft_synth(
         qemb = embedder.encode([p.question for p in pairs], query=True)
     finally:
         embedder.release()
+    # Attach hard negatives to each pair and save as JSONL.
     for p, qe in zip(pairs, qemb, strict=True):
         p.negatives = mine_negatives(qe, demb, ids, arts, p.article_id, negatives)
     out = settings.paths.results / "rerank" / "synth.jsonl"
@@ -1067,6 +1175,7 @@ def ft_synth(
     typer.echo(f"{len(pairs)}/{len(picked)} synthetic groups -> {out}")
 
 
+# CLI `bench ft-train`: fine-tune a reranker's top layers on the synthetic groups.
 @app.command("ft-train")
 def ft_train(
     base: str = typer.Option("qwents", help="name from rerank.RERANKERS"),
@@ -1082,6 +1191,7 @@ def ft_train(
     from fixgraph.retrieval.finetune import SynthPair, train_listwise
     from fixgraph.retrieval.rerank import RERANKERS
 
+    # Load training groups and the base reranker model.
     settings = load_settings()
     _, docs = _outside_corpus(settings)
     lines = (settings.paths.results / "rerank" / "synth.jsonl").read_text(encoding="utf-8")
@@ -1090,6 +1200,7 @@ def ft_train(
     device = "cuda" if torch.cuda.is_available() else "cpu"
     kwargs = {"torch_dtype": torch.float32}
     model = CrossEncoder(model_name, device=device, max_length=max_length, model_kwargs=kwargs)
+    # Train, then save the model and a small JSON record of the training settings and loss.
     hist = train_listwise(model, pairs, docs, prompt=prompt, train_layers=train_layers,
                           epochs=epochs, lr=lr, seed=settings.seed)  # fmt: skip
     target = settings.paths.root / "models" / out_name
@@ -1100,6 +1211,7 @@ def ft_train(
     typer.echo(json.dumps(meta))
 
 
+# CLI `bench rr-select`: record the reranking finalists from the dev log, once.
 @app.command("rr-select")
 def rr_select() -> None:
     """Record the finalists (D41) from results/rerank/dev_log.json before the test split."""
@@ -1118,6 +1230,7 @@ def rr_select() -> None:
     typer.echo(", ".join(f["config"] for f in fin) or "no finalist beats the baseline")
 
 
+# CLI `bench rr-test`: one locked test run of baseline and finalists via the live retriever.
 @app.command("rr-test")
 def rr_test(out: str = typer.Option("results/rerank/test_report.json")) -> None:
     """The single locked-test run (D39/D41): S1 and each finalist through the live retriever on
@@ -1131,6 +1244,7 @@ def rr_test(out: str = typer.Option("results/rerank/test_report.json")) -> None:
     from fixgraph.retrieval.index import load_bm25, open_client
     from fixgraph.retrieval.rerank import CrossEncoderReranker
 
+    # Refuse to rerun and check the frozen test hash before doing anything.
     if Path(out).exists():
         raise typer.BadParameter(f"{out} exists; the test split is evaluated once")
     sel = json.loads((_RR / "selected.json").read_text(encoding="utf-8"))
@@ -1141,9 +1255,11 @@ def rr_test(out: str = typer.Option("results/rerank/test_report.json")) -> None:
         != split["test_sha256"]
     ):
         raise typer.BadParameter("test questions do not match the frozen split hash")
+    # Baseline config first, then each finalist.
     cfgs = [StudyConfig(**sel["baseline"]["spec"])] + [
         StudyConfig(**f["spec"]) for f in sel["finalists"]
     ]
+    # Load docs, embedder and index; set up result and timing dicts per config.
     settings = load_settings()
     paths = settings.paths
     docs, _ = _chunk_docs(settings)
@@ -1164,6 +1280,7 @@ def rr_test(out: str = typer.Option("results/rerank/test_report.json")) -> None:
                                     second=models[c.second] if c.second else None, w2=c.w2,
                                     alpha=c.alpha)  # fmt: skip
                 r.retrieve(qs[0].question, 8)  # warm-up, not timed
+                # Time each question's live retrieval and keep the ranked chunk ids.
                 for q in tqdm(qs, desc=c.name):
                     t0 = time.perf_counter()
                     res = r.retrieve(q.question, 8)
@@ -1175,6 +1292,7 @@ def rr_test(out: str = typer.Option("results/rerank/test_report.json")) -> None:
     finally:
         client.close()
         embedder.release()
+    # Build the test summary and save it, including raw rankings for later checks.
     report = test_summary(qs, ranked, latency, cfgs[0].name)
     report["selected"] = sel
     report["ranked"] = ranked
@@ -1187,6 +1305,7 @@ def rr_test(out: str = typer.Option("results/rerank/test_report.json")) -> None:
 # --- query decomposition (D42) -------------------------------------------------------------------
 
 
+# Cached record for one question in the decomposition study: sub-queries, ranked lists, timings.
 class DecompRow(BaseModel):
     qid: str
     subs: list[str]
@@ -1196,6 +1315,7 @@ class DecompRow(BaseModel):
     search_s: float = 0.0  # all first-stage searches + CE passes
 
 
+# CLI `bench rr-decomp`: dev study of splitting questions into sub-queries before retrieval.
 @app.command("rr-decomp")
 def rr_decomp(split: str = typer.Option("dev"), pool: int = typer.Option(30)) -> None:
     """Decompose each question with the local LLM, retrieve and rerank per sub-query, and log
@@ -1214,6 +1334,7 @@ def rr_decomp(split: str = typer.Option("dev"), pool: int = typer.Option(30)) ->
         raise typer.BadParameter("rr-decomp is a dev study; the test run goes through rr-test")
     settings = load_settings()
     paths = settings.paths
+    # Step 1: the LLM decomposes each question into sub-queries (timed).
     qs = _combo_questions(split)
     model = settings.llm.answer_model
     client = build_llm_client(settings)
@@ -1227,6 +1348,7 @@ def rr_decomp(split: str = typer.Option("dev"), pool: int = typer.Option(30)) ->
     finally:
         client.close()
         _unload(settings, model)
+    # Step 2: retrieve and rerank for the original question and each sub-query.
     docs, _ = _chunk_docs(settings)
     embedder, reranker = SentenceTransformerEmbedder(), CrossEncoderReranker.named("bge")
     idx = open_client(paths.index)
@@ -1239,6 +1361,7 @@ def rr_decomp(split: str = typer.Option("dev"), pool: int = typer.Option(30)) ->
                 cands = [c for c, _ in hybrid.candidates_for(text, pool)]
                 sc = reranker.score(text, [docs[c] for c in cands])
                 row.lists.append(sorted(zip(cands, sc, strict=True), key=lambda x: -x[1]))
+            # Score any extra chunks against the original question so all merges share one scale.
             row.orig = dict(row.lists[0])
             extra = sorted({c for lst in row.lists[1:] for c, _ in lst} - set(row.orig))
             if extra:
@@ -1249,8 +1372,10 @@ def rr_decomp(split: str = typer.Option("dev"), pool: int = typer.Option(30)) ->
         idx.close()
         reranker.release()
         embedder.release()
+    # Save the per-question rows.
     out = paths.results / "rerank" / f"decomp_{split}.jsonl"
     out.write_text("".join(r.model_dump_json() + "\n" for r in rows.values()), encoding="utf-8")
+    # Step 3: compare S1 with three merge strategies on recall@8 per subset, plus latency.
     log = []
     for how in ("s1", "orig", "max", "rr"):
         ranked = {
@@ -1271,6 +1396,7 @@ def rr_decomp(split: str = typer.Option("dev"), pool: int = typer.Option(30)) ->
             entry["latency_s_mean"] = round(sum(lat) / len(lat), 4)
         log.append(entry)
         typer.echo(json.dumps(entry))
+    # Save the decomposition dev log.
     n_split = sum(bool(r.subs) for r in rows.values())
     _RR.mkdir(parents=True, exist_ok=True)
     (_RR / "decomp_dev_log.json").write_text(
@@ -1279,6 +1405,7 @@ def rr_decomp(split: str = typer.Option("dev"), pool: int = typer.Option(30)) ->
     typer.echo(f"{n_split}/{len(qs)} questions decomposed")
 
 
+# CLI `bench rr-latency`: timing-only rerun of the baseline and finalists on a split.
 @app.command("rr-latency")
 def rr_latency(split: str = typer.Option("test")) -> None:
     """Timing-only rerun of the baseline and finalists (no metrics): per-query retrieval seconds
@@ -1291,6 +1418,7 @@ def rr_latency(split: str = typer.Option("test")) -> None:
     from fixgraph.retrieval.index import load_bm25, open_client
     from fixgraph.retrieval.rerank import CrossEncoderReranker
 
+    # Load the selected configs, docs, questions and models.
     sel = json.loads((_RR / "selected.json").read_text(encoding="utf-8"))
     cfgs = [StudyConfig(**sel["baseline"]["spec"])] + [
         StudyConfig(**f["spec"]) for f in sel["finalists"]
@@ -1304,6 +1432,7 @@ def rr_latency(split: str = typer.Option("test")) -> None:
     ranked: dict[str, dict[str, list[str]]] = {}
     try:
         bm25 = load_bm25(settings.paths.index)
+        # Run each config with only its rerankers loaded and record raw per-query seconds.
         for c in cfgs:
             models = {n: CrossEncoderReranker.named(n)
                       for n in {c.scorer, *([c.second] if c.second else [])}}  # fmt: skip
@@ -1325,6 +1454,7 @@ def rr_latency(split: str = typer.Option("test")) -> None:
     finally:
         client.close()
         embedder.release()
+    # Summarise timings per config: mean, p50, p95 and max.
     summary = {}
     for name, xs in raw.items():
         s = sorted(xs)
@@ -1337,6 +1467,7 @@ def rr_latency(split: str = typer.Option("test")) -> None:
         for name in summary:
             same = sum(set(ranked[name][q]) == set(locked[name][q]) for q in ranked[name])
             summary[name]["same_top8_as_test_run"] = f"{same}/{len(ranked[name])}"
+    # Save summary, raw timings and rankings, then print the summary.
     (_RR / f"latency_{split}.json").write_text(
         json.dumps({"summary": summary, "raw": raw, "ranked": ranked}, indent=1) + "\n",
         encoding="utf-8",

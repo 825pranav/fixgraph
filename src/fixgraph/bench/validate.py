@@ -5,6 +5,7 @@ Labels are stored as (qid, system, score) only; answers are re-read from the run
 so no generated text is duplicated into the committed labels file.
 """
 
+# Imports: stdlib for sampling and file IO, plus the kappa functions from bench.stats.
 import json
 import random
 from collections import defaultdict
@@ -17,9 +18,11 @@ from pydantic import BaseModel
 from fixgraph.bench.schema import Question
 from fixgraph.bench.stats import cohens_kappa, weighted_kappa
 
+# Keyboard keys the human presses, mapped to rubric scores.
 _KEYS = {"0": 0.0, "5": 0.5, "1": 1.0}
 
 
+# One human grade for one (question, system) answer, saved as a JSONL line.
 class HumanLabel(BaseModel):
     qid: str
     system: str
@@ -27,6 +30,7 @@ class HumanLabel(BaseModel):
     labeler: str
 
 
+# Pick which answers a human should grade: balanced across systems, answerable only.
 def sample_for_labeling(
     keys: list[tuple[str, str]], questions: dict[str, Question], n: int, seed: int = 13
 ) -> list[tuple[str, str]]:
@@ -34,17 +38,20 @@ def sample_for_labeling(
     shuffles) so kappa is not dominated by one retriever. Unanswerable questions are scored
     mechanically (abstained or not), so they need no human label."""
     rng = random.Random(seed)
+    # Group answerable (qid, system) keys by system and shuffle each group with a fixed seed.
     by_system: dict[str, list[tuple[str, str]]] = defaultdict(list)
     for k in sorted(k for k in keys if k[0] in questions and questions[k[0]].answerable):
         by_system[k[1]].append(k)
     for pool in by_system.values():
         rng.shuffle(pool)
+    # Round-robin across systems so the sample is not dominated by one retriever.
     out: list[tuple[str, str]] = []
     for batch in zip_longest(*(by_system[s] for s in sorted(by_system))):
         out += [k for k in batch if k is not None]
     return out[:n]
 
 
+# Load saved human labels from JSONL; a missing file just means no labels yet.
 def read_labels(path: Path) -> list[HumanLabel]:
     if not path.exists():
         return []
@@ -52,6 +59,7 @@ def read_labels(path: Path) -> list[HumanLabel]:
     return [HumanLabel.model_validate_json(x) for x in lines if x.strip()]
 
 
+# Interactive terminal loop where a human grades answers blind; saves after every label.
 def label_loop(
     todo: list[tuple[str, str]],
     questions: dict[str, Question],
@@ -66,6 +74,7 @@ def label_loop(
     The system name is hidden so labels are blind to which retriever produced the answer."""
     labels = list(existing)
     done = {(x.qid, x.system) for x in labels}
+    # Skip already-labelled items so a quit-and-resume session picks up where it left off.
     for i, key in enumerate(todo):
         if key in done:
             continue
@@ -75,6 +84,7 @@ def label_loop(
             f"\n[{i + 1}/{len(todo)}] {q.question}\nREFERENCE: {q.gold_answer}\nKEY FACTS:\n{facts}"
             f"\nANSWER:\n{answer_text.get(key) or '(abstained / empty)'}"
         )
+        # Keep asking until a valid key; a score is saved at once, s skips, q quits early.
         while True:
             k = ask("[1] correct  [5] partial  [0] wrong  [s]kip  [q]uit > ").strip().lower()[:1]
             if k in _KEYS:
@@ -90,6 +100,7 @@ def label_loop(
     return labels
 
 
+# Summary of how well the LLM judge agrees with the human on the same answers.
 class Agreement(BaseModel):
     n: int
     kappa: float
@@ -99,6 +110,7 @@ class Agreement(BaseModel):
     human_mean: float
 
 
+# Compare human and judge scores on the overlapping items and compute agreement stats.
 def agreement(labels: list[HumanLabel], judge_scores: dict[tuple[str, str], float]) -> Agreement:
     pairs = [
         (x.score, judge_scores[(x.qid, x.system)])
@@ -107,6 +119,7 @@ def agreement(labels: list[HumanLabel], judge_scores: dict[tuple[str, str], floa
     ]
     if not pairs:
         raise ValueError("no overlapping labels")
+    # Plain kappa treats scores as labels, so convert them to strings first.
     human = [str(h) for h, _ in pairs]
     judge = [str(j) for _, j in pairs]
     return Agreement(
@@ -119,14 +132,17 @@ def agreement(labels: list[HumanLabel], judge_scores: dict[tuple[str, str], floa
     )
 
 
+# Save human labels to JSONL, one per line.
 def write_labels(labels: list[HumanLabel], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("".join(x.model_dump_json() + "\n" for x in labels), encoding="utf-8")
 
 
+# Read a finished benchmark run: answer text and judge score keyed by (qid, system).
 def load_run(run_dir: Path) -> tuple[dict[tuple[str, str], str], dict[tuple[str, str], float]]:
     """(qid, system) -> answer text, and -> judge score, from a benchmark run directory."""
     answers: dict[tuple[str, str], str] = {}
+    # Join the answer sentences back into one text; abstentions become empty strings.
     for line in (run_dir / "answers.jsonl").read_text(encoding="utf-8").splitlines():
         r = json.loads(line)
         a = r["answer"]
@@ -134,6 +150,7 @@ def load_run(run_dir: Path) -> tuple[dict[tuple[str, str], str], dict[tuple[str,
             "" if a["abstained"] else " ".join(s["text"] for s in a["sentences"])
         )
     judged: dict[tuple[str, str], float] = {}
+    # Pull the judge score for each (qid, system) from judged.jsonl.
     for line in (run_dir / "judged.jsonl").read_text(encoding="utf-8").splitlines():
         r = json.loads(line)
         judged[(r["qid"], r["system"])] = float(r["judge"]["score"])
@@ -143,6 +160,7 @@ def load_run(run_dir: Path) -> tuple[dict[tuple[str, str], str], dict[tuple[str,
 # --- judge calibration (D33) ----------------------------------------------------------------
 
 
+# The frozen dev / heldout split of human labels used to calibrate judge prompts fairly.
 class LabelSplit(BaseModel):
     """Which labelled (qid, system) pairs may be used to design judge prompts (dev) and which
     are only scored once (heldout). Fixed by seed before any prompt is tried."""
@@ -152,6 +170,7 @@ class LabelSplit(BaseModel):
     heldout: list[tuple[str, str]]
 
 
+# Split labels into dev (prompt design) and heldout (final check), per system, with a fixed seed.
 def split_labels(labels: list[HumanLabel], dev_frac: float = 1 / 3, seed: int = 13) -> LabelSplit:
     """Stratified by system so both halves see every retriever."""
     rng = random.Random(seed)
@@ -160,6 +179,7 @@ def split_labels(labels: list[HumanLabel], dev_frac: float = 1 / 3, seed: int = 
         by_system[x.system].append((x.qid, x.system))
     dev: list[tuple[str, str]] = []
     held: list[tuple[str, str]] = []
+    # For each system, shuffle its labels and put the first dev_frac share into dev.
     for system in sorted(by_system):
         pool = by_system[system]
         rng.shuffle(pool)
@@ -169,6 +189,7 @@ def split_labels(labels: list[HumanLabel], dev_frac: float = 1 / 3, seed: int = 
     return LabelSplit(seed=seed, dev=sorted(dev), heldout=sorted(held))
 
 
+# Choose the few-shot examples for judge v4: one dev item per score level.
 def pick_examples(labels: list[HumanLabel], dev: list[tuple[str, str]]) -> list[tuple[str, str]]:
     """v4 worked examples: the first dev item (by qid, system) at each score level 1, 0.5, 0."""
     score = {(x.qid, x.system): x.score for x in labels}

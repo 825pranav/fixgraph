@@ -9,6 +9,7 @@ Used by: bench/run.py (judge stage, feeds the unsupported-claim-rate metric).
 Uses: answer.grounded (GroundedAnswer), llm.structured.complete_structured.
 """
 
+# Imports: the answer types being checked and the structured LLM call helpers.
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -17,18 +18,22 @@ from fixgraph.answer.grounded import AnswerSentence, GroundedAnswer
 from fixgraph.llm.base import ChatMessage, LLMClient, LLMRequest
 from fixgraph.llm.structured import StructuredOutputError, complete_structured
 
+# The three labels the judge model can give a claim.
 Verdict = Literal["supported", "partial", "unsupported"]
 
 
+# One verdict from the judge, pointing at a claim by its number in the prompt.
 class ClaimVerdict(BaseModel):
     claim: int
     verdict: Verdict
 
 
+# JSON shape the judge model must return: a list of per-claim verdicts.
 class VerifierOutput(BaseModel):
     verdicts: list[ClaimVerdict] = Field(default_factory=lambda: list[ClaimVerdict]())
 
 
+# Result of verification: a label per original sentence, the sentences kept, and call stats.
 class VerifiedAnswer(BaseModel):
     verdicts: list[Verdict]  # one per original sentence
     kept: list[AnswerSentence]  # post-verifier answer (unsupported claims dropped)
@@ -37,6 +42,7 @@ class VerifiedAnswer(BaseModel):
     error: str | None = None
 
 
+# System prompt for the judge: label each claim only against the sources it cites.
 SYSTEM_VERIFIER = """You check whether claims are supported by their cited sources.
 For each numbered claim decide:
 - supported: the cited sources state it (paraphrase is fine).
@@ -45,11 +51,14 @@ For each numbered claim decide:
 Judge only against the sources shown, not your own knowledge."""
 
 
+# Build the judge request: the cited chunks as labelled sources, then the numbered claims.
 def build_verifier_request(
     sentences: list[AnswerSentence], chunk_text: dict[str, str], model: str, num_ctx: int = 8192
 ) -> LLMRequest:
+    # Collect every chunk id cited by any claim and render those chunks as the sources block.
     cited = sorted({c for s in sentences for c in s.citations})
     sources = "\n\n".join(f"[{c}]\n{chunk_text.get(c, '')}" for c in cited)
+    # Number the claims 0..n-1 so the judge's verdicts can be mapped back to sentences.
     claims = "\n".join(
         f"{i}. {s.text}  (cites: {', '.join(s.citations)})" for i, s in enumerate(sentences)
     )
@@ -71,15 +80,19 @@ def build_verifier_request(
     )
 
 
+# Harness-only claim checker: GroundedAnswer in -> VerifiedAnswer with unsupported claims dropped.
 def verify_answer(
     client: LLMClient, answer: GroundedAnswer, chunk_text: dict[str, str], model: str
 ) -> VerifiedAnswer:
+    # Nothing to verify if the answer already abstained.
     if answer.abstained or not answer.sentences:
         return VerifiedAnswer(verdicts=[], kept=[], abstained=True)
+    # Start every sentence as "unsupported"; only cited sentences get sent to the judge.
     verdicts: list[Verdict] = ["unsupported"] * len(answer.sentences)
     cited_idx = [i for i, s in enumerate(answer.sentences) if s.citations]
     calls = 0
     error = None
+    # One judge call for all cited sentences, then map each verdict back to its original sentence.
     if cited_idx:
         cited_sentences = [answer.sentences[i] for i in cited_idx]
         request = build_verifier_request(cited_sentences, chunk_text, model)
@@ -89,8 +102,10 @@ def verify_answer(
             for v in out.verdicts:
                 if 0 <= v.claim < len(cited_idx):
                     verdicts[cited_idx[v.claim]] = v.verdict
+        # If the judge fails, cited claims stay "unsupported", which is the safe default.
         except (StructuredOutputError, RuntimeError) as exc:
             error = str(exc)[:300]  # leave cited claims unjudged -> conservative "unsupported"
+    # Keep supported and partial sentences; if none survive, count the answer as abstained.
     kept = [s for s, v in zip(answer.sentences, verdicts, strict=True) if v != "unsupported"]
     return VerifiedAnswer(
         verdicts=verdicts, kept=kept, abstained=not kept, judge_calls=calls, error=error

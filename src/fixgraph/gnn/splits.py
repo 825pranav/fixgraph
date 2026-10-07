@@ -11,6 +11,7 @@ Used by: gnn/cli.py (`gnn train`).
 Uses: gnn.data (GraphData, message_graph, TARGET / REV_TARGET).
 """
 
+# Imports: torch / PyG for tensors and the transductive splitter, plus our graph helpers.
 import random
 from dataclasses import dataclass
 
@@ -22,6 +23,7 @@ from torch_geometric.data import HeteroData
 from fixgraph.gnn.data import REV_TARGET, TARGET, GraphData, message_graph
 
 
+# Everything a training run needs: message graphs for train and eval, and the positive edges.
 @dataclass
 class LinkSplit:
     message: HeteroData  # training-time message graph (no supervision or test edges)
@@ -31,9 +33,11 @@ class LinkSplit:
     held_out_articles: frozenset[str]
 
 
+# Main split: hold out ~20% of articles; edges known only from those articles become test edges.
 def article_held_out_split(
     g: GraphData, holdout_frac: float = 0.2, seed: int = 0, supervision_frac: float = 0.3
 ) -> LinkSplit:
+    # Pick held-out articles with a seeded RNG; mark edges whose articles are all held out as test.
     articles = sorted(set().union(*g.target_articles)) if g.target_articles else []
     rng = random.Random(seed)
     n_held = round(len(articles) * holdout_frac)
@@ -42,6 +46,7 @@ def article_held_out_split(
         [bool(a) and a <= held for a in g.target_articles], dtype=torch.bool
     ).reshape(-1)
 
+    # Shuffle the remaining edges and split them into supervision edges and message-passing edges.
     train_idx = (~is_test).nonzero().view(-1)
     gen = torch.Generator().manual_seed(seed)
     perm = train_idx[torch.randperm(len(train_idx), generator=gen)]
@@ -51,6 +56,7 @@ def article_held_out_split(
         n_sup = max(1, int(len(perm) * supervision_frac))
         sup, msg = perm[:n_sup], perm[n_sup:]
 
+    # Message graphs: training uses only message edges, evaluation uses all non-test edges.
     keep_msg = torch.zeros(len(g.target_articles), dtype=torch.bool)
     keep_msg[msg] = True
     ei = g.target_edge_index
@@ -63,6 +69,7 @@ def article_held_out_split(
     )
 
 
+# Secondary split: standard PyG random link split on the target relation (not article-aware).
 def transductive_split(g: GraphData, seed: int = 0) -> tuple[HeteroData, HeteroData, HeteroData]:
     """Train/val/test HeteroData from RandomLinkSplit on the target relation."""
     torch.manual_seed(seed)

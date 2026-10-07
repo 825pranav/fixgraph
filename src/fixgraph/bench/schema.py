@@ -4,11 +4,13 @@ Used by: bench/generate.py (writes questions), bench/screen.py (adds `screen`), 
 bench/validate.py (read them), `fixgraph bench *` commands in bench/cli.py.
 """
 
+# Imports: pathlib for the JSONL files, pydantic to validate each question line.
 from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
+# The question types we benchmark; per-type results let us see where graph retrieval helps.
 QType = Literal[
     "single_hop",
     "cross_device",
@@ -21,11 +23,13 @@ QType = Literal[
 ]
 
 
+# Turn a chunk id into its article id, used to know which articles a question's evidence spans.
 def article_of(chunk_id: str) -> str:
     """Chunk ids are `{article_id}:{section_idx}:{chunk_idx}` (core/models.py)."""
     return chunk_id.split(":", 1)[0]
 
 
+# Result of the automatic LLM screen; it only sorts the human review queue, it never approves.
 class ScreenResult(BaseModel):
     """Automatic pre-screen verdict (bench/screen.py). Advisory only: it orders and annotates
     the human review queue, it never sets `Question.verified`."""
@@ -44,6 +48,7 @@ class ScreenResult(BaseModel):
     model: str = ""
 
 
+# One benchmark question: the text, gold answer, gold evidence chunks, and review status.
 class Question(BaseModel):
     qid: str
     question: str
@@ -61,15 +66,18 @@ class Question(BaseModel):
     verified_by: str = ""
     screen: ScreenResult | None = None
 
+    # Distinct articles behind the gold chunks, e.g. to check a question really needs two articles.
     @property
     def article_ids(self) -> list[str]:
         """Articles the gold evidence comes from (chunk ids start with the article id)."""
         return sorted({article_of(c) for c in self.gold_chunk_ids})
 
 
+# Which subset of questions a command should use, from loosest to strictest.
 QuestionFilter = Literal["all", "screened", "verified"]
 
 
+# Filter the question list by review status before running a benchmark.
 def select_questions(questions: list[Question], which: QuestionFilter) -> list[Question]:
     """all = everything; screened = auto-screen passed or verified; verified = reviewed
     (`verified_by` names the reviewer). `bench verify` removes rejected questions from the file;
@@ -81,11 +89,13 @@ def select_questions(questions: list[Question], which: QuestionFilter) -> list[Q
     return questions
 
 
+# Load questions from a JSONL file: one validated Question per non-empty line.
 def read_questions(path: Path) -> list[Question]:
     lines = path.read_text(encoding="utf-8").splitlines()
     return [Question.model_validate_json(x) for x in lines if x.strip()]
 
 
+# Save questions back to JSONL, one JSON object per line, creating the folder if needed.
 def write_questions(questions: list[Question], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("".join(q.model_dump_json() + "\n" for q in questions), encoding="utf-8")

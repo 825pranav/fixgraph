@@ -5,6 +5,7 @@ llm.cache. Used by: cli.py (`llm smoke`), the kg and bench CLIs, and api/app.py.
 Uses: core.config.Settings, llm.ollama, llm.openai_compat, llm.fake, llm.cache.
 """
 
+# Imports: settings plus every LLM backend this factory can pick between.
 from fixgraph.core.config import Settings
 from fixgraph.llm.base import LLMClient
 from fixgraph.llm.cache import CachedLLMClient, SQLiteCache
@@ -13,15 +14,19 @@ from fixgraph.llm.ollama import OllamaClient
 from fixgraph.llm.openai_compat import OpenAICompatClient
 
 
+# Turn the config into one ready LLM client: pick the backend, then optionally wrap it in the
+# SQLite reply cache. Every CLI and the API get their model client through here.
 def build_llm_client(settings: Settings, use_cache: bool = True) -> LLMClient:
     cfg = settings.llm
     client: LLMClient
+    # Choose the backend named in settings: fake (tests), Ollama native, or any OpenAI-style server.
     if cfg.backend == "fake":
         client = FakeLLMClient()
     elif cfg.backend == "ollama":
         client = OllamaClient(cfg.base_url, keep_alive=cfg.keep_alive, timeout_s=cfg.timeout_s)
     else:
         client = OpenAICompatClient(cfg.base_url, api_key=cfg.api_key, timeout_s=cfg.timeout_s)
+    # Wrap the backend so identical requests are answered from the on-disk cache instead of the GPU.
     if use_cache:
         client = CachedLLMClient(client, SQLiteCache(settings.resolve(cfg.cache_path)))
     return client

@@ -12,12 +12,14 @@ Every string must be copied from the chunk, and validation fuzzy-grounds it ther
 Uses: core.models.Chunk, core.ontology, llm.base (request types).
 """
 
+# Imports: pydantic models double as the JSON schema sent to the LLM, plus chunk and request types.
 from pydantic import BaseModel, Field
 
 from fixgraph.core.models import Chunk
 from fixgraph.core.ontology import Ontology
 from fixgraph.llm.base import ChatMessage, LLMRequest
 
+# Stored on every extraction record so outputs from different prompt versions never mix.
 PROMPT_VERSION = "v2"
 
 # ---------------------------------------------------------------------------
@@ -25,6 +27,7 @@ PROMPT_VERSION = "v2"
 # ---------------------------------------------------------------------------
 
 
+# One fix inside a problem; its position means RESOLVED_BY, addresses_cause gives ADDRESSES.
 class LLMFix(BaseModel):
     action: str = Field(description="The fix, copied from the text (2-15 words).")
     addresses_cause: str | None = Field(
@@ -37,6 +40,7 @@ class LLMFix(BaseModel):
     )
 
 
+# One problem (the symptom) with everything attached to it; list caps stop runaway output.
 class LLMProblem(BaseModel):
     symptom: str = Field(description="The observable problem, copied from the text.")
     products: list[str] = Field(default_factory=lambda: list[str](), max_length=5)
@@ -48,6 +52,7 @@ class LLMProblem(BaseModel):
     fixes: list[LLMFix] = Field(default_factory=lambda: list[LLMFix](), max_length=8)
 
 
+# A product with its parts, OS versions and the products it depends on.
 class LLMProduct(BaseModel):
     name: str
     components: list[str] = Field(default_factory=lambda: list[str](), max_length=5)
@@ -55,6 +60,7 @@ class LLMProduct(BaseModel):
     depends_on: list[str] = Field(default_factory=lambda: list[str](), max_length=3)
 
 
+# Top-level form the LLM must return; its JSON schema is passed to Ollama for constrained output.
 class LLMExtraction(BaseModel):
     products: list[LLMProduct] = Field(default_factory=lambda: list[LLMProduct](), max_length=6)
     problems: list[LLMProblem] = Field(default_factory=lambda: list[LLMProblem](), max_length=6)
@@ -65,11 +71,13 @@ class LLMExtraction(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+# A typed node mention, e.g. ("Symptom", "AirPods won't connect").
 class GraphEntity(BaseModel):
     type: str
     text: str
 
 
+# A typed edge between two entity indexes, with the text that backs it up.
 class GraphRelation(BaseModel):
     head: int
     rel: str
@@ -77,16 +85,19 @@ class GraphRelation(BaseModel):
     evidence: str  # string whose presence in the chunk supports the relation
 
 
+# Flat graph for one chunk: what validation, gold labels and the KG builder all consume.
 class ChunkExtraction(BaseModel):
     entities: list[GraphEntity] = Field(default_factory=lambda: list[GraphEntity]())
     relations: list[GraphRelation] = Field(default_factory=lambda: list[GraphRelation]())
 
 
+# Helper that builds a ChunkExtraction while removing duplicate entities and edges.
 class _GraphBuilder:
     def __init__(self) -> None:
         self.g = ChunkExtraction()
         self._index: dict[tuple[str, str], int] = {}
 
+    # Add an entity (or reuse an existing one with the same type and text) and return its index.
     def ent(self, type_: str, text: str) -> int | None:
         text = text.strip().strip(".")
         if not text:
@@ -97,6 +108,7 @@ class _GraphBuilder:
             self.g.entities.append(GraphEntity(type=type_, text=text))
         return self._index[key]
 
+    # Add an edge unless an end is missing, it is a self-loop, or the same edge already exists.
     def rel(self, head: int | None, rel: str, tail: int | None, evidence: str) -> None:
         if head is None or tail is None or head == tail:
             return
@@ -105,6 +117,7 @@ class _GraphBuilder:
         self.g.relations.append(GraphRelation(head=head, rel=rel, tail=tail, evidence=evidence))
 
 
+# Decide whether a fix prerequisite is an OS version, a product or a feature, using ontology rules.
 def classify_requirement(text: str, ontology: Ontology) -> str:
     """Type a prerequisite string: OSVersion, Product or Feature (rule-based)."""
     if ontology.os_versions_in(text) or text.split(" ")[0] in ontology.os_platforms:
@@ -114,8 +127,10 @@ def classify_requirement(text: str, ontology: Ontology) -> str:
     return "Feature"
 
 
+# Convert the nested LLM form into typed entities and relations; the slot decides the relation type.
 def to_graph(x: LLMExtraction, ontology: Ontology) -> ChunkExtraction:
     b = _GraphBuilder()
+    # Product section: components, OS versions and dependencies hang off each product.
     for p in x.products:
         prod = b.ent("Product", p.name)
         for c in p.components:
@@ -124,6 +139,7 @@ def to_graph(x: LLMExtraction, ontology: Ontology) -> ChunkExtraction:
             b.rel(prod, "RUNS", b.ent("OSVersion", v), v)
         for d in p.depends_on:
             b.rel(prod, "DEPENDS_ON", b.ent("Product", d), d)
+    # Problem section: the symptom is the hub that products, codes, parts and OS versions link to.
     for pr in x.problems:
         sym = b.ent("Symptom", pr.symptom)
         for name in pr.products:
@@ -136,10 +152,12 @@ def to_graph(x: LLMExtraction, ontology: Ontology) -> ChunkExtraction:
             b.rel(sym, "INVOLVES", b.ent("Feature", f), f)
         for v in pr.os_versions:
             b.rel(sym, "APPLIES_TO", b.ent("OSVersion", v), v)
+        # Remember cause ids by text so a fix's addresses_cause can be linked to the right cause.
         causes: dict[str, int | None] = {}
         for c in pr.causes:
             causes[c.strip().lower()] = cid = b.ent("Cause", c)
             b.rel(sym, "CAUSED_BY", cid, c)
+        # Each fix resolves the symptom, may address a cause, and may require prerequisites.
         for fx in pr.fixes:
             fid = b.ent("Fix", fx.action)
             b.rel(sym, "RESOLVED_BY", fid, fx.action)
@@ -155,6 +173,7 @@ def to_graph(x: LLMExtraction, ontology: Ontology) -> ChunkExtraction:
 # Prompt
 # ---------------------------------------------------------------------------
 
+# System prompt explaining each slot of the nested form; tells the model to copy text, not invent.
 SYSTEM_PROMPT = """You extract troubleshooting facts from Apple support text as JSON.
 Use ONLY what the text states. Copy short phrases from the text; do not invent or generalize.
 
@@ -175,6 +194,7 @@ problems: each problem/symptom the text describes and how to solve it.
 If the text is a how-to with no problem, return problems: [].
 Keep every string under 15 words."""
 
+# Three worked examples (problem with causes, error code, how-to with no problem) for few-shot.
 _FEWSHOT: list[tuple[str, str]] = [
     (
         "Article: If your AirPods won't connect\nSection: Check your iPhone\nText:\n"
@@ -211,10 +231,12 @@ _FEWSHOT: list[tuple[str, str]] = [
 ]
 
 
+# The user message for one chunk: article title, section heading, then the chunk text.
 def chunk_prompt(chunk: Chunk, article_title: str) -> str:
     return f"Article: {article_title}\nSection: {chunk.heading}\nText:\n{chunk.text}"
 
 
+# Full chat: system prompt, the few-shot pairs, then the real chunk last.
 def build_messages(chunk: Chunk, article_title: str) -> list[ChatMessage]:
     messages = [ChatMessage(role="system", content=SYSTEM_PROMPT)]
     for user, assistant in _FEWSHOT:
@@ -224,6 +246,7 @@ def build_messages(chunk: Chunk, article_title: str) -> list[ChatMessage]:
     return messages
 
 
+# Package the chat into an LLMRequest with temperature 0, thinking off and the JSON schema attached.
 def build_request(
     chunk: Chunk, article_title: str, model: str, num_ctx: int = 8192, max_tokens: int = 1200
 ) -> LLMRequest:

@@ -4,6 +4,7 @@ Used by: retrieval.hybrid (final stage of S1-S3); built by bench/cli.py and api/
 Uses: retrieval.bm25 (tokenizer for LexicalReranker).
 """
 
+# Imports: gc/logging for model cleanup and logs; the BM25 tokenizer is reused by the fake reranker.
 import gc
 import logging
 from typing import Protocol
@@ -12,6 +13,7 @@ from fixgraph.retrieval.bm25 import tokenize
 
 logger = logging.getLogger(__name__)
 
+# Model ids for the default bge reranker, the Qwen alternative and the troubleshooting instruction.
 DEFAULT_RERANKER = "BAAI/bge-reranker-v2-m3"
 QWEN_RERANKER = "Qwen/Qwen3-Reranker-0.6B"
 TROUBLESHOOT_PROMPT = (
@@ -34,13 +36,16 @@ RERANKERS: dict[str, tuple[str, int, str | None]] = {
 }
 
 
+# Interface for rerankers: score(question, passages) gives one relevance score per passage.
 class Reranker(Protocol):
     def score(self, query: str, docs: list[str]) -> list[float]: ...
 
     def release(self) -> None: ...
 
 
+# Real cross-encoder: reads the question and each passage together and scores how well they match.
 class CrossEncoderReranker:
+    # Loads the cross-encoder once (float16 on GPU) with its max length and optional instruction.
     def __init__(
         self,
         model_name: str = DEFAULT_RERANKER,
@@ -61,12 +66,14 @@ class CrossEncoderReranker:
         self._prompt = prompt  # instruction for instruction-tuned rerankers (Qwen3-Reranker)
         logger.info("loaded reranker %s on %s", model_name, device)
 
+    # Builds a reranker from a RERANKERS name; Qwen models get a smaller batch to fit in VRAM.
     @classmethod
     def named(cls, name: str, device: str | None = None) -> "CrossEncoderReranker":
         model, max_length, prompt = RERANKERS[name]
         batch = 4 if model == QWEN_RERANKER or "qwen" in name else 16
         return cls(model, device=device, max_length=max_length, prompt=prompt, batch_size=batch)
 
+    # Scores (question, passage) pairs in batches; HybridRetriever.rerank calls it on the top 30.
     def score(self, query: str, docs: list[str]) -> list[float]:
         if not docs:
             return []
@@ -74,6 +81,7 @@ class CrossEncoderReranker:
         scores = self._model.predict(pairs, batch_size=self._batch_size, prompt=self._prompt)
         return [float(s) for s in scores]
 
+    # Frees the cross-encoder and GPU cache when a stage is finished with it.
     def release(self) -> None:
         import torch
 
@@ -83,12 +91,15 @@ class CrossEncoderReranker:
             torch.cuda.empty_cache()
 
 
+# Test double that scores passages without loading any model.
 class LexicalReranker:
     """Fake reranker: query-term overlap. Deterministic, for tests."""
 
+    # Score = share of the question's terms that also appear in the passage.
     def score(self, query: str, docs: list[str]) -> list[float]:
         q = set(tokenize(query))
         return [len(q & set(tokenize(d))) / (len(q) or 1) for d in docs]
 
+    # Nothing to free; exists to match the Reranker interface.
     def release(self) -> None:
         pass

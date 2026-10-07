@@ -11,6 +11,7 @@ Used by: kg.run_extract (validates every LLM output); kg.quality and kg.resolve 
 Uses: kg.extraction (ChunkExtraction), kg.schema.relation_allowed.
 """
 
+# Imports: difflib for fuzzy matching, pydantic for the validated output, schema for type rules.
 import re
 import unicodedata
 from collections import Counter
@@ -21,17 +22,21 @@ from pydantic import BaseModel, Field
 from fixgraph.kg.extraction import ChunkExtraction
 from fixgraph.kg.schema import relation_allowed
 
+# Map curly quotes to straight ones and collapse whitespace so matching ignores formatting.
 _QUOTES = str.maketrans({"’": "'", "‘": "'", "“": '"', "”": '"'})
 _WS = re.compile(r"\s+")
 
 
+# Canonical form for comparing phrases: Unicode-normalized, straight quotes, lowercase, trimmed.
 def normalize(text: str) -> str:
     text = unicodedata.normalize("NFKC", text).translate(_QUOTES).lower()
     return _WS.sub(" ", text).strip(" .,:;!?\"'")
 
 
+# Fuzzy "is this phrase in the text" score; used to ground entities and evidence in the chunk.
 def partial_ratio(needle: str, haystack: str) -> float:
     """Best similarity (0-1) between `needle` and any same-length window of `haystack`."""
+    # Quick exits: empty needle, exact substring, or needle at least as long as the text.
     n, h = normalize(needle), normalize(haystack)
     if not n:
         return 0.0
@@ -39,6 +44,7 @@ def partial_ratio(needle: str, haystack: str) -> float:
         return 1.0
     if len(n) >= len(h):
         return SequenceMatcher(None, n, h).ratio()
+    # Check character windows aligned with each matching block and keep the best score.
     best = 0.0
     matcher = SequenceMatcher(None, n, h, autojunk=False)
     for block in matcher.get_matching_blocks():
@@ -59,11 +65,13 @@ def partial_ratio(needle: str, haystack: str) -> float:
     return best
 
 
+# Character offsets of an entity inside the chunk text.
 class Span(BaseModel):
     start: int
     end: int
 
 
+# An entity that survived validation, with how well it matched the chunk.
 class ValidEntity(BaseModel):
     type: str
     text: str
@@ -71,6 +79,7 @@ class ValidEntity(BaseModel):
     span: Span | None = None  # exact location when found verbatim
 
 
+# A relation that survived validation; head/tail are indexes into the validated entity list.
 class ValidRelation(BaseModel):
     head: int  # index into ValidatedExtraction.entities
     rel: str
@@ -80,12 +89,14 @@ class ValidRelation(BaseModel):
     evidence_score: float
 
 
+# Output of validate(): kept entities, kept relations, and a count of each reject reason.
 class ValidatedExtraction(BaseModel):
     entities: list[ValidEntity] = Field(default_factory=lambda: list[ValidEntity]())
     relations: list[ValidRelation] = Field(default_factory=lambda: list[ValidRelation]())
     rejects: dict[str, int] = Field(default_factory=lambda: dict[str, int]())
 
 
+# Find the exact character span of a phrase in the chunk, or None if it is not there verbatim.
 def locate(text: str, chunk_text: str) -> Span | None:
     """Case-insensitive exact location of `text` in the chunk (quote-normalized)."""
     hay = chunk_text.translate(_QUOTES).lower()
@@ -94,6 +105,8 @@ def locate(text: str, chunk_text: str) -> Span | None:
     return None if idx < 0 else Span(start=idx, end=idx + len(needle))
 
 
+# Core check run on every extraction: drop anything the chunk does not support.
+# Entities and relations in, ValidatedExtraction with confidences and reject counts out.
 def validate(
     raw: ChunkExtraction,
     chunk_text: str,
@@ -108,6 +121,7 @@ def validate(
     entities: list[ValidEntity] = []
     remap: dict[int, int] = {}
     seen: dict[tuple[str, str], int] = {}
+    # Pass 1, entities: drop empty ones, merge duplicates, and score how well each is grounded.
     for i, e in enumerate(raw.entities):
         text = e.text.strip()
         if not normalize(text):
@@ -128,6 +142,7 @@ def validate(
             )
         )
 
+    # Pass 2, relations: apply each rule in order and count why a relation was rejected.
     relations: list[ValidRelation] = []
     seen_rel: set[tuple[int, str, int]] = set()
     for r in raw.relations:
@@ -141,6 +156,7 @@ def validate(
         if not relation_allowed(r.rel, entities[h].type, entities[t].type):
             rejects["relation_type_violation"] += 1
             continue
+        # Evidence sentence must fuzzy-match the text, and both endpoints must be grounded too.
         score = partial_ratio(r.evidence, seen_text)
         if score < evidence_threshold:
             rejects["relation_evidence_not_found"] += 1
@@ -151,6 +167,7 @@ def validate(
         if (h, r.rel, t) in seen_rel:
             rejects["relation_duplicate"] += 1
             continue
+        # Confidence is the weakest of the three grounding scores, not the model's own guess.
         seen_rel.add((h, r.rel, t))
         conf = min(entities[h].grounding, entities[t].grounding, score)
         relations.append(

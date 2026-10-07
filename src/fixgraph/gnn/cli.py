@@ -8,6 +8,7 @@ Used by: cli.py (mounted as `gnn`).
 Uses: kg.store.read_kg, embeddings, gnn.data, gnn.splits, gnn.models, gnn.evaluate.
 """
 
+# Imports: typer for the CLI, polars to write predicted edges, and our gnn modules.
 import hashlib
 import json
 import logging
@@ -25,12 +26,14 @@ from fixgraph.gnn.models import adamic_adar_scores, cosine_scores, train_distmul
 from fixgraph.gnn.splits import article_held_out_split
 from fixgraph.kg.store import EDGE_SCHEMA, read_kg
 
+# Typer app mounted as `fixgraph gnn`, and the four models we compare.
 logger = logging.getLogger(__name__)
 app = typer.Typer(no_args_is_help=True, help="GNN link prediction (Symptom -> Fix).")
 
 MODELS = ("cosine", "adamic_adar", "distmult", "hetero_sage")
 
 
+# Load the KG, embed node text into a PyG graph, and make sure the output folder exists.
 def _load_graph() -> tuple[GraphData, Path]:
     from fixgraph.embeddings import SentenceTransformerEmbedder
 
@@ -46,9 +49,11 @@ def _load_graph() -> tuple[GraphData, Path]:
     return g, out
 
 
+# One seed: make the article-held-out split, train each model, and score them on test edges.
 def run_seed(g: GraphData, seed: int, epochs: int, device: str) -> dict[str, dict[str, float]]:
     split = article_held_out_split(g, holdout_frac=0.2, seed=seed)
     known = known_fixes(g.target_edge_index)
+    # Baselines and DistMult see all non-test edges; GraphSAGE trains on its disjoint message graph.
     ev = split.eval_message
     dm = train_distmult(ev, epochs=epochs * 2, seed=seed, device=device)
     sage = train_sage(split.message, split.train_pos, epochs=epochs, seed=seed, device=device)
@@ -60,6 +65,7 @@ def run_seed(g: GraphData, seed: int, epochs: int, device: str) -> dict[str, dic
     }
 
 
+# Format the aggregated metrics as a Markdown table (mean +- std over seeds).
 def results_markdown(agg: dict[str, dict[str, dict[str, float]]], n_test: list[int]) -> str:
     lines = [
         "| Model | MRR | Hits@1 | Hits@3 | Hits@10 | AUROC |",
@@ -80,6 +86,7 @@ def results_markdown(agg: dict[str, dict[str, dict[str, float]]], n_test: list[i
     return "\n".join(lines) + "\n"
 
 
+# CLI `gnn train`: run every model over several seeds and save results.json and results.md.
 @app.command()
 def train(
     epochs: int = typer.Option(100),
@@ -90,10 +97,12 @@ def train(
     device = "cuda" if torch.cuda.is_available() else "cpu"
     per_seed: list[dict[str, dict[str, float]]] = []
     n_test: list[int] = []
+    # Run each seed and record how many test edges it held out.
     for seed in range(seeds):
         n_test.append(int(article_held_out_split(g, seed=seed).test_pos.size(1)))
         per_seed.append(run_seed(g, seed, epochs, device))
         logger.info("seed %d: %s", seed, json.dumps(per_seed[-1]))
+    # Average across seeds, then write the JSON and Markdown reports.
     agg = {m: aggregate([r[m] for r in per_seed]) for m in MODELS}
     report = {
         "split": "article_held_out",
@@ -110,6 +119,7 @@ def train(
     typer.echo(md)
 
 
+# CLI `gnn gaps`: train on all known edges and write the top predicted missing Symptom->Fix links.
 @app.command()
 def gaps(
     top_k: int = typer.Option(50),
@@ -118,11 +128,13 @@ def gaps(
     """Top-K predicted missing Symptom->Fix links from a model trained on all known edges."""
     g, out = _load_graph()
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    # holdout_frac=0 means no test edges: the model learns from everything we know.
     split = article_held_out_split(g, holdout_frac=0.0, seed=0)
     model = train_sage(split.message, split.train_pos, epochs=epochs, seed=0, device=device)
     known = known_fixes(g.target_edge_index)
     n_sym = g.num_nodes("Symptom")
     candidates: list[tuple[float, int, int]] = []
+    # Score symptoms in batches of 512; hide known fixes so only new links are proposed.
     for start in range(0, n_sym, 512):
         syms = torch.arange(start, min(start + 512, n_sym))
         scores = model.scores(split.eval_message, syms)
@@ -132,8 +144,10 @@ def gaps(
                 r[list(known[s])] = float("-inf")
             vals, idx = torch.topk(r, min(top_k, r.numel()))
             candidates += [(float(v), s, int(f)) for v, f in zip(vals, idx, strict=True)]
+    # Keep the global top-K by score.
     candidates.sort(key=lambda x: -x[0])
     now = datetime.now(UTC).isoformat(timespec="seconds")
+    # Write each candidate to JSONL (for review) and as a "predicted" edge row for the API.
     rows = []
     with (out / "gap_candidates.jsonl").open("w", encoding="utf-8") as f:
         for score, s, fx in candidates[:top_k]:
@@ -163,5 +177,6 @@ def gaps(
                     "n_support": 0,
                 }
             )
+    # Save predicted edges as parquet with the same schema as real KG edges.
     pl.DataFrame(rows, schema=EDGE_SCHEMA).write_parquet(out / "predicted_edges.parquet")
     typer.echo(f"{len(rows)} predicted links -> {out / 'gap_candidates.jsonl'}")

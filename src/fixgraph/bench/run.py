@@ -13,6 +13,7 @@ Uses: retrieval.linking (mentions), answer.grounded, answer.verifier, bench.judg
 bench.metrics, bench.stats.
 """
 
+# Imports: answer generation, claim verifier, judge, metrics and stats used by the stages below.
 import json
 import logging
 import math
@@ -34,10 +35,12 @@ from fixgraph.llm.base import LLMClient
 from fixgraph.retrieval.base import RetrievalResult, Retriever
 from fixgraph.retrieval.linking import Mentions
 
+# K = how many chunks each retriever hands to the answer model.
 logger = logging.getLogger(__name__)
 K = 8
 
 
+# Write a list of rows (pydantic models or dicts) as JSONL, one per line.
 def _write(path: Path, rows: Sequence[BaseModel] | Sequence[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
@@ -45,6 +48,7 @@ def _write(path: Path, rows: Sequence[BaseModel] | Sequence[dict[str, Any]]) -> 
             f.write((r.model_dump_json() if isinstance(r, BaseModel) else json.dumps(r)) + "\n")
 
 
+# Read a JSONL file back into a list of dicts.
 def _read(path: Path) -> list[dict[str, Any]]:
     return [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines() if x.strip()]
 
@@ -52,6 +56,7 @@ def _read(path: Path) -> list[dict[str, Any]]:
 # --- stages -----------------------------------------------------------------------------------
 
 
+# Stage 1: the LLM extracts entity mentions from each question; saved for graph seed linking.
 def stage_mentions(
     questions: list[Question], client: LLMClient, model: str, out: Path
 ) -> dict[str, Mentions]:
@@ -65,10 +70,12 @@ def stage_mentions(
     return found
 
 
+# Reload saved mentions so later runs skip the LLM extraction step.
 def load_mentions(path: Path) -> dict[str, Mentions]:
     return {r["question"]: Mentions.model_validate(r["mentions"]) for r in _read(path)}
 
 
+# One retrieval result: which system, which question, ranked chunks and graph seed nodes.
 class RetrievalRow(BaseModel):
     qid: str
     system: str
@@ -76,10 +83,12 @@ class RetrievalRow(BaseModel):
     seeds: list[str] = []
 
 
+# Stage 2: every system (S1..S4) retrieves top-k chunks for every question; saved to JSONL.
 def stage_retrieve(
     questions: list[Question], systems: dict[str, Retriever], out: Path, k: int = K
 ) -> list[RetrievalRow]:
     rows: list[RetrievalRow] = []
+    # Loop systems x questions; graph retrievers also expose the seed nodes they started from.
     for name, retriever in systems.items():
         for q in tqdm(questions, desc=f"retrieve {name}"):
             res = retriever.retrieve(q.question, k)
@@ -89,12 +98,14 @@ def stage_retrieve(
     return rows
 
 
+# One generated answer for one (question, system) pair.
 class AnswerRow(BaseModel):
     qid: str
     system: str
     answer: GroundedAnswer
 
 
+# Stage 3: the answer model writes a grounded answer from each system's retrieved chunks.
 def stage_answer(
     questions: list[Question],
     retrievals: list[RetrievalRow],
@@ -106,6 +117,7 @@ def stage_answer(
 ) -> list[AnswerRow]:
     by_key = {(r.qid, r.system): r for r in retrievals}
     rows: list[AnswerRow] = []
+    # S0 is the closed-book baseline (no context); other systems answer from their ranked chunks.
     for name in systems:
         for q in tqdm(questions, desc=f"answer {name}"):
             if name == "S0":
@@ -118,6 +130,7 @@ def stage_answer(
     return rows
 
 
+# One judged answer: claim-level verifier verdicts plus the correctness judge's score.
 class JudgeRow(BaseModel):
     qid: str
     system: str
@@ -125,6 +138,7 @@ class JudgeRow(BaseModel):
     judge: JudgeOutput
 
 
+# Stage 4: verify claims against cited chunks and grade correctness with the judge model.
 def stage_judge(
     questions: list[Question],
     answers: list[AnswerRow],
@@ -139,6 +153,7 @@ def stage_judge(
     states which judge prompt produced the scores."""
     qmap = {q.qid: q for q in questions}
     rows: list[JudgeRow] = []
+    # S0 has no citations to verify, so it gets an empty verdict list.
     for a in tqdm(answers, desc="judge"):
         q = qmap[a.qid]
         ver = (
@@ -149,6 +164,7 @@ def stage_judge(
         jd = judge_answer(client, q, a.answer.text, a.answer.abstained, model, variant, examples)
         rows.append(JudgeRow(qid=a.qid, system=a.system, verified=ver, judge=jd))
     _write(out, rows)
+    # Record which judge model and prompt produced these scores, for the report.
     meta = {"model": model, "variant": variant, "n_examples": len(examples)}
     (out.parent / "judge_meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     return rows
@@ -157,12 +173,14 @@ def stage_judge(
 # --- report -------------------------------------------------------------------------------------
 
 
+# Turn one judged answer into a dict of metrics: correctness, recall, citations, latency.
 def per_question_metrics(
     q: Question, retrieval: RetrievalRow | None, answer: AnswerRow, judged: JudgeRow
 ) -> dict[str, float]:
     chunks = retrieval.result.chunk_ids if retrieval else []
     cited = answer.answer.cited_chunk_ids
     facts = judged.judge.key_facts_covered
+    # Metrics that apply to every question.
     m: dict[str, float] = {
         "correctness": judged.judge.score,
         "key_fact_recall": (sum(facts) / len(facts)) if facts else float("nan"),
@@ -170,22 +188,27 @@ def per_question_metrics(
         "latency_answer_s": answer.answer.latency_s,
         "latency_retrieval_s": retrieval.result.timings.get("total_s", 0.0) if retrieval else 0.0,
     }
+    # Retrieval metrics only for answerable questions that had a retrieval step.
     if q.answerable and retrieval is not None:
         m["recall@8"] = M.recall_at_k(chunks, q.gold_chunk_ids, 8)
         m["recall@4"] = M.recall_at_k(chunks, q.gold_chunk_ids, 4)
         m["support_complete@8"] = M.support_complete(chunks, q.gold_chunk_ids, 8)
+    # Citation and hallucination metrics only when the system actually answered with context.
     if q.answerable and answer.system != "S0" and not answer.answer.abstained:
         m["citation_precision"] = M.citation_precision(cited, q.gold_chunk_ids)
         m["citation_recall"] = M.citation_recall(cited, q.gold_chunk_ids)
         m["unsupported_rate"] = M.unsupported_rate(judged.verified.verdicts)
+    # Whether the graph retriever fell back to plain retrieval for this question.
     if retrieval is not None:
         m["graph_fallback"] = retrieval.result.timings.get("fallback", 0.0)
     return m
 
 
+# Metrics we run significance tests on, comparing each system to the baseline.
 TEST_METRICS = ("correctness", "recall@8", "support_complete@8", "unsupported_rate")
 
 
+# Paired tests of each system vs baseline on the same questions, Holm-corrected per metric.
 def _paired_tests(
     per: dict[str, dict[str, dict[str, float]]],
     systems: list[str],
@@ -198,6 +221,7 @@ def _paired_tests(
     tests: list[dict[str, Any]] = []
     if baseline not in per:
         return tests
+    # For each metric, test every system on the questions both it and the baseline have values for.
     for metric in metrics:
         rows = []
         for s in systems:
@@ -226,17 +250,20 @@ def _paired_tests(
                     "effect_dz": paired_effect_size(a, b),
                 }
             )
+        # Holm-correct within the metric across systems.
         for row, adj in zip(rows, holm([r["p"] for r in rows]), strict=True):
             row["p_holm"] = adj
         tests.extend(rows)
     return tests
 
 
+# Split results into single-article vs multi-article questions: the key graph-vs-RAG comparison.
 def _by_evidence_span(
     questions: list[Question], per: dict[str, dict[str, dict[str, float]]], systems: list[str]
 ) -> dict[str, dict[str, dict[str, float]]]:
     """Mean correctness and recall@8 per system, split by whether the gold evidence spans one
     article or several: the split the graph-vs-RAG research question is about."""
+    # Label each question by how many articles its gold evidence spans.
     span = {
         q.qid: "multi-article" if len(q.article_ids) > 1 else "single-article" for q in questions
     }
@@ -257,6 +284,7 @@ def _by_evidence_span(
     return out
 
 
+# Average one metric per question type per system, for the per-type tables.
 def _mean_by_type(
     qmap: dict[str, Question],
     per: dict[str, dict[str, dict[str, float]]],
@@ -276,6 +304,7 @@ def _mean_by_type(
     return dict(out)
 
 
+# Count verified, auto-screened and total questions, so the report is honest about review.
 def _provenance(questions: list[Question]) -> dict[str, Any]:
     """How much of the question set was verified (and by whom) vs only auto-screened."""
     by = Counter(q.verified_by or "unknown" for q in questions if q.verified)
@@ -287,6 +316,7 @@ def _provenance(questions: list[Question]) -> dict[str, Any]:
     }
 
 
+# Stage 5: combine the saved JSONL from all stages into one report dict with CIs and tests.
 def build_report(
     questions: list[Question],
     retrievals: list[RetrievalRow],
@@ -294,10 +324,12 @@ def build_report(
     judged: list[JudgeRow],
     baseline: str = "S1",
 ) -> dict[str, Any]:
+    # Index retrievals and answers by (qid, system) so judged rows can be joined to them.
     qmap = {q.qid: q for q in questions}
     r_by = {(r.qid, r.system): r for r in retrievals}
     a_by = {(a.qid, a.system): a for a in answers}
     per: dict[str, dict[str, dict[str, float]]] = defaultdict(dict)  # system -> qid -> metrics
+    # Compute per-question metrics for every judged row.
     for j in judged:
         if j.qid not in qmap:
             continue  # row for a question outside this report's set (e.g. rejected in review)
@@ -305,6 +337,7 @@ def build_report(
         per[j.system][j.qid] = per_question_metrics(
             q, r_by.get((j.qid, j.system)), a_by[(j.qid, j.system)], j
         )
+    # Build the main table: bootstrap CI of each metric per system.
     systems = sorted(per)
     metric_names = sorted({k for s in per.values() for m in s.values() for k in m})
     table: dict[str, dict[str, dict[str, float]]] = {}
@@ -314,6 +347,7 @@ def build_report(
             vals = M.nan_drop([per[s][qid].get(name, float("nan")) for qid in per[s]])
             ci = bootstrap_ci(vals)
             table[s][name] = {"mean": ci.mean, "lo": ci.lo, "hi": ci.hi, "n": ci.n}
+        # Latency percentiles over retrieval plus answer time (no CI for these).
         lat = [
             per[s][qid]["latency_answer_s"] + per[s][qid]["latency_retrieval_s"] for qid in per[s]
         ]
@@ -329,6 +363,7 @@ def build_report(
             "hi": math.nan,
             "n": len(lat),
         }
+        # Abstention precision and recall per system.
         abst = M.abstention_prf(
             [bool(per[s][qid]["abstained"]) for qid in per[s]],
             [not qmap[qid].answerable for qid in per[s]],
@@ -346,10 +381,12 @@ def build_report(
             "n": abst["tp"] + abst["fn"],
         }
 
+    # Significance tests vs the baseline, on all questions and on multi-article ones only.
     tests = _paired_tests(per, systems, baseline, TEST_METRICS)
     multi_qids = {q.qid for q in questions if len(q.article_ids) > 1}
     subset_tests = _paired_tests(per, systems, baseline, ("correctness", "recall@8"), multi_qids)
 
+    # Everything the CLI writes to report.json and logs to MLflow.
     return {
         "n_questions": len(questions),
         "types": dict(Counter(q.qtype for q in questions)),
@@ -364,11 +401,13 @@ def build_report(
     }
 
 
+# One table cell for the evidence-span table: correctness / recall (n).
 def _span_cell(v: dict[str, float]) -> str:
     recall = "—" if math.isnan(v["recall@8"]) else f"{v['recall@8']:.2f}"
     return f"{v['correctness']:.2f} / {recall} (n={int(v['n'])})"
 
 
+# Render the report dict as a Markdown summary with tables.
 def render_markdown(report: dict[str, Any]) -> str:
     table = report["table"]
     systems = sorted(table)
@@ -378,6 +417,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         "latency_p50_s", "latency_p95_s",
     ]  # fmt: skip
 
+    # Format one cell as "mean [lo, hi]", or just the mean when there is no CI.
     def cell(s: str, c: str) -> str:
         v = table[s].get(c)
         if not v or v["mean"] is None or (isinstance(v["mean"], float) and math.isnan(v["mean"])):
@@ -386,12 +426,14 @@ def render_markdown(report: dict[str, Any]) -> str:
             return f"{v['mean']:.2f}"
         return f"{v['mean']:.2f} [{v['lo']:.2f}, {v['hi']:.2f}]"
 
+    # Main metric table: one row per metric, one column per system.
     lines = [f"Questions: {report['n_questions']} ({report['types']})", ""]
     lines.append("| metric | " + " | ".join(systems) + " |")
     lines.append("|---|" + "---|" * len(systems))
     for c in cols:
         lines.append(f"| {c} | " + " | ".join(cell(s, c) for s in systems) + " |")
     lines += _tests_table("Paired permutation tests vs S1 (Holm-corrected):", report["tests"])
+    # Add the provenance and judge lines near the top.
     prov = report.get("provenance")
     if prov:
         lines.insert(
@@ -404,6 +446,7 @@ def render_markdown(report: dict[str, Any]) -> str:
     judge = report.get("judge")
     if judge:
         lines.insert(1, f"Judge: {judge['model']}, prompt {judge['variant']}")
+    # Extra tables: by evidence span, multi-article tests and per-type breakdowns.
     spans = report.get("by_evidence_span", {})
     if any(spans.values()):
         lines += ["", "By evidence span (correctness / recall@8, n):", ""]
@@ -424,6 +467,7 @@ def render_markdown(report: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+# Markdown table for a list of paired test results.
 def _tests_table(title: str, tests: list[dict[str, Any]]) -> list[str]:
     lines = ["", title, "", "| metric | system | n | diff | p | p (Holm) | d_z |"]
     lines.append("|---|---|---|---|---|---|---|")
@@ -435,6 +479,7 @@ def _tests_table(title: str, tests: list[dict[str, Any]]) -> list[str]:
     return lines
 
 
+# Markdown table of a metric per question type per system.
 def _by_type_table(
     title: str, by_type: dict[str, dict[str, float]], systems: list[str]
 ) -> list[str]:
